@@ -188,65 +188,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
       title: 'プレイヤー',
       onBack: () => Services.of(context).model.go(Screen.home),
       child: PageBody(
-        maxWidth: 640,
+        maxWidth: 1040,
         children: [
-          const DoodleHeading('なまえ'),
-          const SizedBox(height: 10),
-          DoodleTextField(
-            controller: _name,
-            hint: 'プレイヤー',
-            maxLength: AppSettings.maxNameLength,
-            onChanged: (v) {
-              // 空欄などのときは保存せず、前の名前を残す
-              if (AppSettings.validateName(v) == null) settings.playerName = v;
-              setState(() {});
-            },
-          ),
-          if (problem != null) ...[const SizedBox(height: 8), StatusLine(state: StatusKind.bad, text: '$problem (いまの名前: ${settings.playerName})')],
-          const SizedBox(height: 24),
-          const DoodleHeading('みため'),
-          const SizedBox(height: 12),
-          AvatarEditor(value: settings.avatar, onChanged: (a) => settings.avatar = a),
-          const SizedBox(height: 14),
-          const Text('次に部屋を作る・参加するときから、相手にも表示されます。', textAlign: TextAlign.center, style: TextStyle(fontSize: 15)),
-        ],
-      ),
-    );
-  }
-}
-
-/// ホームの登録した名前の表示。押すとプロフィールを変えられる（スマホ版 _PlayerBadge）。
-class PlayerBadge extends StatelessWidget {
-  const PlayerBadge({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final s = Services.of(context);
-    return Center(
-      child: Semantics(
-        button: true,
-        label: 'プレイヤー ${s.settings.playerName}。名前と見た目を変える',
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            onTap: () => s.model.go(Screen.profile),
-            child: DoodleBox(
-              seed: 171,
-              dashed: true,
-              padding: const EdgeInsets.fromLTRB(8, 6, 12, 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AvatarIcon(avatar: s.settings.avatar, size: 44),
-                  const SizedBox(width: 10),
-                  Flexible(child: Text(s.settings.playerName, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 19))),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.edit_rounded, color: Palette.pencil, size: 18),
-                ],
+          LayoutBuilder(builder: (context, constraints) {
+            final name = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const DoodleHeading('なまえ'),
+              const SizedBox(height: 10),
+              DoodleTextField(
+                controller: _name,
+                hint: 'プレイヤー',
+                maxLength: AppSettings.maxNameLength,
+                onChanged: (v) {
+                  if (AppSettings.validateName(v) == null) settings.playerName = v;
+                  setState(() {});
+                },
               ),
-            ),
-          ),
-        ),
+              if (problem != null) ...[const SizedBox(height: 8), StatusLine(state: StatusKind.bad, text: '$problem (いまの名前: ${settings.playerName})')],
+              const SizedBox(height: 14),
+              const Text('次に部屋を作る・参加するときから、相手にも表示されます。', style: TextStyle(fontSize: 15)),
+            ]);
+            final appearance = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const DoodleHeading('みため'),
+              const SizedBox(height: 12),
+              AvatarEditor(value: settings.avatar, onChanged: (a) => settings.avatar = a, horizontal: constraints.maxWidth >= 760 && MediaQuery.textScalerOf(context).scale(1) <= 1.3),
+            ]);
+            if (constraints.maxWidth < 760 || MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [name, const SizedBox(height: 24), appearance]);
+            }
+            return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [name, const SizedBox(height: 24), appearance]);
+          }),
+        ],
       ),
     );
   }

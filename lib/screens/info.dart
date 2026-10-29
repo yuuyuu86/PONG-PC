@@ -3,15 +3,21 @@ import 'package:flutter/material.dart';
 import '../app/app_model.dart';
 import '../app/feedback.dart';
 import '../app/services.dart';
-import '../app/settings.dart';
 import '../games/core/catalog.dart';
 import '../ui/doodle.dart';
 import '../ui/widgets.dart';
-import 'room.dart';
 import 'root.dart';
 
-class HowToScreen extends StatelessWidget {
+/// あそびかた。「はじめかた」と競技ごとのタブに分ける（スマホ版と同じ）。
+class HowToScreen extends StatefulWidget {
   const HowToScreen({super.key});
+
+  @override
+  State<HowToScreen> createState() => _HowToScreenState();
+}
+
+class _HowToScreenState extends State<HowToScreen> {
+  int _tab = 0;
 
   static const _steps = [
     '2台のPC（Mac / Windows どちらでも）を同じWi-Fiにつなぎ、両方で PONG! を開きます。サーバーの準備は要りません。',
@@ -29,48 +35,53 @@ class HowToScreen extends StatelessWidget {
       onBack: () => model.go(Screen.home),
       child: PageBody(
         children: [
-          DoodleBox(
-            seed: 70,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const DoodleHeading('2台で遊ぶ', size: 21),
-                const SizedBox(height: 8),
-                for (final (i, s) in _steps.indexed)
-                  Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Text('${i + 1}. $s', style: const TextStyle(fontSize: 17, height: 1.45))),
-              ],
-            ),
+          DoodleTabs(
+            labels: ['はじめかた', for (final g in GameKind.values) g.title],
+            selected: _tab,
+            seed: 150,
+            onChanged: (i) => setState(() => _tab = i),
           ),
-          const SizedBox(height: 18),
-          LayoutBuilder(builder: (context, c) {
-            final w = c.maxWidth > 700 ? (c.maxWidth - 18) / 2 : c.maxWidth;
-            return Wrap(
-              spacing: 18,
-              runSpacing: 18,
-              children: [
-                for (final g in GameKind.values)
-                  SizedBox(
-                    width: w,
-                    child: DoodleBox(
-                      seed: 71 + g.index,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          DoodleHeading('PONG! ${g.title}', size: 20),
-                          const SizedBox(height: 8),
-                          ControlsList(controls: g.controls, size: 15),
-                          const SizedBox(height: 6),
-                          Text(g.ruleText, style: const TextStyle(fontSize: 15, color: Palette.pencil)),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          }),
-          const SizedBox(height: 16),
-          const Text('どちらの画面にもコート全体が同じ向きで見えます。自分の選手は太い線と、墨で塗った「あなた」の名札で表示されます。',
-              style: TextStyle(fontSize: 16, color: Palette.pencil)),
+          const SizedBox(height: 20),
+          if (_tab > 0)
+            _GameRules(game: GameKind.values[_tab - 1])
+          else ...[
+            const DoodleHeading('はじめかた', size: 21),
+            const SizedBox(height: 10),
+            for (final (i, s) in _steps.indexed)
+              Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('${i + 1}. $s', style: const TextStyle(fontSize: 17, height: 1.45))),
+            const SizedBox(height: 6),
+            const Text('どちらの画面にもコート全体が同じ向きで見えます。自分の選手は太い線と、墨で塗った「あなた」の名札、相手は点線の名札「あいて」で見分けられます。',
+                style: TextStyle(fontSize: 16, height: 1.45)),
+            const SizedBox(height: 6),
+            const Text('通信が切れたら試合は自動で止まり、つながり直すと同じところから続きます。', style: TextStyle(fontSize: 16, height: 1.45)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 競技ごとのタブの中身: 特徴・ルール・操作
+class _GameRules extends StatelessWidget {
+  const _GameRules({required this.game});
+  final GameKind game;
+
+  @override
+  Widget build(BuildContext context) {
+    return DoodleBox(
+      seed: 71 + game.index,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DoodleHeading('PONG! ${game.title}', size: 21),
+          const SizedBox(height: 8),
+          Text(game.summary, style: const TextStyle(fontSize: 17, height: 1.45)),
+          const SizedBox(height: 6),
+          Text(game.ruleText, style: const TextStyle(fontSize: 16, color: Palette.pencil)),
+          const SizedBox(height: 14),
+          const DoodleHeading('そうさ（2台とも同じキー）', size: 18),
+          const SizedBox(height: 8),
+          ControlsList(controls: game.controls, size: 16),
         ],
       ),
     );
@@ -85,81 +96,14 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late final _name = TextEditingController(text: Services.of(context).settings.playerName);
-  String? _error;
-
-  @override
-  void dispose() {
-    _name.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    final settings = Services.of(context).settings;
-    final err = AppSettings.validateName(_name.text);
-    setState(() => _error = err);
-    if (err == null) settings.playerName = _name.text;
-  }
-
   @override
   Widget build(BuildContext context) {
     final s = Services.of(context);
     return DoodleScaffold(
       title: '設定',
-      onBack: () {
-        _save();
-        s.model.go(Screen.home);
-      },
+      onBack: () => s.model.go(Screen.home),
       child: PageBody(
         children: [
-          DoodleBox(
-            seed: 80,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const DoodleHeading('なまえ と みため', size: 21),
-                const SizedBox(height: 8),
-                const Text('近くのPCの一覧や招待状、部屋に出ます。', style: TextStyle(fontSize: 16)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    SizedBox(
-                      width: 300,
-                      child: TextField(
-                        controller: _name,
-                        maxLength: AppSettings.maxNameLength,
-                        style: const TextStyle(fontSize: 24),
-                        decoration: InputDecoration(
-                          errorText: _error,
-                          enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Palette.ink, width: 2.4)),
-                          focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Palette.ink, width: 3)),
-                        ),
-                        onSubmitted: (_) => _save(),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    SizedBox(width: 120, child: DoodleButton(label: '保存', seed: 81, fontSize: 18, onPressed: _save)),
-                    const SizedBox(width: 10),
-                    SizedBox(
-                      width: 150,
-                      child: DoodleButton(
-                        label: 'おまかせ',
-                        seed: 84,
-                        fontSize: 18,
-                        onPressed: () {
-                          _name.text = AppSettings.suggestName();
-                          _save();
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const ProfileEditor(),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
           DoodleBox(
             seed: 82,
             child: ListenableBuilder(

@@ -7,41 +7,29 @@ import 'avatar_painter.dart';
 
 /// 棒人間の着せ替え。パーツごとに ◀ ▶ で切り替える。
 class AvatarEditor extends StatelessWidget {
-  const AvatarEditor({super.key, required this.value, required this.onChanged});
+  const AvatarEditor({super.key, required this.value, required this.onChanged, this.horizontal = false});
 
   final Avatar value;
   final ValueChanged<Avatar> onChanged;
+  final bool horizontal;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Center(
-          child: Semantics(
-            label: '見た目のプレビュー。${AvatarPart.values.map((p) => '${p.label} ${value.optionLabel(p)}').join('、')}',
-            child: DoodleBox(
-              seed: 181,
-              shadow: true,
-              padding: const EdgeInsets.fromLTRB(28, 10, 28, 6),
-              child: AvatarView(avatar: value, size: 170),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        for (final part in AvatarPart.values) _PartRow(part: part, value: value, onChanged: onChanged),
-        const SizedBox(height: 8),
-        Align(
-          child: DoodleButton(
-            label: 'おまかせ',
-            icon: Icons.casino_outlined,
-            fontSize: 17,
-            seed: 182,
-            onPressed: () => onChanged(Avatar.random()),
-          ),
-        ),
-      ],
+    final preview = Center(
+      child: Semantics(
+        label: '見た目のプレビュー。${AvatarPart.values.map((p) => '${p.label} ${value.optionLabel(p)}').join('、')}',
+        child: DoodleBox(seed: 181, shadow: true, padding: const EdgeInsets.fromLTRB(28, 10, 28, 6), child: AvatarView(avatar: value, size: 170)),
+      ),
     );
+    final options = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      for (final part in AvatarPart.values) _PartRow(part: part, value: value, onChanged: onChanged),
+      const SizedBox(height: 8),
+      Align(child: DoodleButton(label: 'おまかせ', icon: Icons.casino_outlined, fontSize: 17, seed: 182, onPressed: () => onChanged(Avatar.random()))),
+    ]);
+    if (horizontal) {
+      return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: preview), const SizedBox(width: 32), Expanded(child: options)]);
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [preview, const SizedBox(height: 14), options]);
   }
 }
 
