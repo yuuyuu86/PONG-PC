@@ -188,27 +188,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
       title: 'プレイヤー',
       onBack: () => Services.of(context).model.go(Screen.home),
       child: PageBody(
-        maxWidth: 640,
+        maxWidth: 1040,
         children: [
-          const DoodleHeading('なまえ'),
-          const SizedBox(height: 10),
-          DoodleTextField(
-            controller: _name,
-            hint: 'プレイヤー',
-            maxLength: AppSettings.maxNameLength,
-            onChanged: (v) {
-              // 空欄などのときは保存せず、前の名前を残す
-              if (AppSettings.validateName(v) == null) settings.playerName = v;
-              setState(() {});
-            },
-          ),
-          if (problem != null) ...[const SizedBox(height: 8), StatusLine(state: StatusKind.bad, text: '$problem (いまの名前: ${settings.playerName})')],
-          const SizedBox(height: 24),
-          const DoodleHeading('みため'),
-          const SizedBox(height: 12),
-          AvatarEditor(value: settings.avatar, onChanged: (a) => settings.avatar = a),
-          const SizedBox(height: 14),
-          const Text('次に部屋を作る・参加するときから、相手にも表示されます。', textAlign: TextAlign.center, style: TextStyle(fontSize: 15)),
+          LayoutBuilder(builder: (context, constraints) {
+            final name = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const DoodleHeading('なまえ'),
+              const SizedBox(height: 10),
+              DoodleTextField(
+                controller: _name,
+                hint: 'プレイヤー',
+                maxLength: AppSettings.maxNameLength,
+                onChanged: (v) {
+                  // 空欄などのときは保存せず、前の名前を残す
+                  if (AppSettings.validateName(v) == null) settings.playerName = v;
+                  setState(() {});
+                },
+              ),
+              if (problem != null) ...[const SizedBox(height: 8), StatusLine(state: StatusKind.bad, text: '$problem (いまの名前: ${settings.playerName})')],
+              const SizedBox(height: 14),
+              const Text('次に部屋を作る・参加するときから、相手にも表示されます。', style: TextStyle(fontSize: 15)),
+            ]);
+            final appearance = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const DoodleHeading('みため'),
+              const SizedBox(height: 12),
+              AvatarEditor(value: settings.avatar, onChanged: (a) => settings.avatar = a),
+            ]);
+            if (constraints.maxWidth < 760 || MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [name, const SizedBox(height: 24), appearance]);
+            }
+            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: name),
+              const SizedBox(width: 32),
+              Expanded(child: appearance),
+            ]);
+          }),
         ],
       ),
     );
