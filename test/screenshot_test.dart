@@ -78,6 +78,9 @@ void main() {
       model.sessionState(e.state);
       await shot('1$i-match-${game.name}');
     }
+    final intro = MatchEngine(GameKind.fencing)..step(const [PlayerInput.none, PlayerInput.none], 1 / 60);
+    model.sessionState(intro.state);
+    await shot('19-intro');
     final over = MatchEngine(GameKind.volley, firstServer: 0);
     var serve = true;
     while (over.state.phase != MatchPhase.over) {

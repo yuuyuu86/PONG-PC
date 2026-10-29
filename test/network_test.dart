@@ -191,4 +191,17 @@ void main() {
     a.dispose();
     b.dispose();
   });
+
+  test('ブロードキャストが届かない環境でも、直接の返事でお互いを見つける', () async {
+    host = HostSession(game: GameKind.volley, me: const Profile('-', ''), listener: Recorder());
+    await listen();
+    // 共有ポート宛ての 127.0.0.1 は片方にしか届かない。届いた側が相手専用のポートへ返事をする
+    final a = Discovery(udpPort: 47598, interval: const Duration(milliseconds: 200), loopbackOnly: true);
+    final b = Discovery(udpPort: 47598, interval: const Duration(milliseconds: 200), loopbackOnly: true);
+    await a.start(name: 'えー', avatar: '', tcpPort: 1111);
+    await b.start(name: 'びー', avatar: '', tcpPort: 2222);
+    await waitUntil('発見', () => a.peers.any((p) => p.name == 'びー') && b.peers.any((p) => p.name == 'えー'));
+    a.dispose();
+    b.dispose();
+  });
 }

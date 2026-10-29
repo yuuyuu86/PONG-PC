@@ -31,6 +31,10 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
+# 効果音プラグイン audioplayers_windows が古い <experimental/coroutine> を使っており、
+# Visual Studio 2026（MSVC 14.51）以降ではエラー扱いになるため、廃止予定の警告として扱わせる。
+# プラグイン側が C++20 の <coroutine> に移ったら消してよい。
+add_definitions(-D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 
 # Compilation settings that should be applied to most targets.
 #

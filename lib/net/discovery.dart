@@ -32,13 +32,16 @@ enum DiscoveryStatus { starting, ready, failed }
 /// 1秒ごとに UDP ブロードキャストで「自分はここにいる（名前・状態・部屋コード・TCP の待ち受けポート）」を知らせ、
 /// 届いたお知らせから一覧を作る。サーバーは要らず、Mac と Windows で同じしくみが動く。
 class Discovery extends ChangeNotifier {
-  Discovery({this.udpPort = defaultPort, this.interval = const Duration(seconds: 1)});
+  Discovery({this.udpPort = defaultPort, this.interval = const Duration(seconds: 1), this.loopbackOnly = false});
 
   static const defaultPort = 47521;
   static const _magic = 'pong-pc/1';
 
   final int udpPort;
   final Duration interval;
+
+  /// ブロードキャストを使わず 127.0.0.1 にだけ送る（ブロードキャストできない環境を再現するテスト用）
+  final bool loopbackOnly;
   final myId = List.generate(8, (_) => math.Random().nextInt(16).toRadixString(16)).join();
 
   List<Peer> get peers => List.unmodifiable(_peers.values.toList()..sort((a, b) => a.name.compareTo(b.name)));
@@ -47,6 +50,12 @@ class Discovery extends ChangeNotifier {
 
   final _peers = <String, Peer>{};
   RawDatagramSocket? _socket;
+
+  /// 自分専用の UDP（返事を受け取る用）。ブロードキャストが届かない向きがあっても、
+  /// 片方から相手が見えれば、ここへ直接お知らせを返して両方から見えるようにする。
+  /// 同じPCで2つ起動したときも、共有ポート宛ての 127.0.0.1 は片方にしか届かないので、これで補う。
+  RawDatagramSocket? _direct;
+  final _lastReply = <String, DateTime>{};
   Timer? _timer;
   var _advert = <String, Object?>{};
   List<InternetAddress> _targets = [InternetAddress('255.255.255.255')];
@@ -57,10 +66,12 @@ class Discovery extends ChangeNotifier {
       // 同じPCで2つ起動しても受け取れるよう、ポートを共有する（Windows は reuseAddress で共有できる）
       final s = await RawDatagramSocket.bind(InternetAddress.anyIPv4, udpPort, reuseAddress: true, reusePort: !Platform.isWindows);
       s.broadcastEnabled = true;
-      s.listen((e) {
-        if (e == RawSocketEvent.read) _receive();
-      });
+      _listen(s);
       _socket = s;
+      final d = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+      _listen(d);
+      _direct = d;
+      _advert['up'] = d.port;
       status = DiscoveryStatus.ready;
     } catch (e) {
       status = DiscoveryStatus.failed;
@@ -76,9 +87,23 @@ class Discovery extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _listen(RawDatagramSocket s) {
+    s.listen(
+      (e) {
+        if (e == RawSocketEvent.read) _receive(s);
+      },
+      // ブロードキャストが許されないネットワークでは送信の失敗がここに届く。探すのは続ける
+      onError: (Object _) {},
+    );
+  }
+
   /// 送り先: 全体へのブロードキャストと、各ネットワークの x.y.z.255（多くの家庭・学校の Wi-Fi はこれで届く）
   Future<void> _refreshTargets() async {
-    final targets = <String>{'255.255.255.255', '127.0.0.1'};
+    final targets = <String>{if (!loopbackOnly) '255.255.255.255', '127.0.0.1'};
+    if (loopbackOnly) {
+      _targets = [InternetAddress.loopbackIPv4];
+      return;
+    }
     try {
       for (final ni in await NetworkInterface.list(type: InternetAddressType.IPv4)) {
         for (final a in ni.addresses) {
@@ -93,7 +118,7 @@ class Discovery extends ChangeNotifier {
 
   /// 自分の状態（待機中 / 部屋あり / 満員 / 試合中）を知らせ直す
   void advertise({required String name, required String avatar, required PeerState state, String? code, GameKind? game}) {
-    final next = {..._advert, 'name': name, 'avatar': avatar, 'state': state.name, 'code': code, 'game': game?.name};
+    final next = <String, Object?>{..._advert, 'name': name, 'avatar': avatar, 'state': state.name, 'code': code, 'game': game?.name};
     if (mapEquals(next, _advert)) return;
     _advert = next;
     _beacon();
@@ -110,9 +135,19 @@ class Discovery extends ChangeNotifier {
     }
   }
 
-  void _receive() {
-    final s = _socket;
-    if (s == null) return;
+  /// 相手専用の UDP へ自分のお知らせを直接返す（同じ相手には間隔をあけて）
+  void _replyTo(String id, InternetAddress address, int port) {
+    final d = _direct;
+    final now = DateTime.now();
+    final last = _lastReply[id];
+    if (d == null || (last != null && now.difference(last) < interval * 2)) return;
+    _lastReply[id] = now;
+    try {
+      d.send(utf8.encode(jsonEncode(_advert)), address, port);
+    } catch (_) {}
+  }
+
+  void _receive(RawDatagramSocket s) {
     Datagram? d;
     var changed = false;
     while ((d = s.receive()) != null) {
@@ -134,6 +169,8 @@ class Discovery extends ChangeNotifier {
         );
         final old = _peers[id];
         _peers[id] = peer;
+        final up = m['up'];
+        if (up is num) _replyTo(id, d.address, up.toInt());
         if (old == null || !old.sameAs(peer)) changed = true;
       } catch (_) {}
     }
@@ -158,6 +195,7 @@ class Discovery extends ChangeNotifier {
   void dispose() {
     _timer?.cancel();
     _socket?.close();
+    _direct?.close();
     super.dispose();
   }
 }

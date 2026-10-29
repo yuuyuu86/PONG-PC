@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../app/app_model.dart';
 import '../app/services.dart';
 import '../avatar/avatar.dart';
+import '../avatar/avatar_editor.dart';
 import '../avatar/avatar_painter.dart';
 import '../games/core/catalog.dart';
 import '../games/core/common.dart';
@@ -140,7 +141,7 @@ class _MatchHud extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _ScoreBox(side: 0, you: model.you, score: h.score[0], serving: serveShown && h.server == 0, bar: h.extra?.bars[0]),
+              _ScoreBox(side: 0, you: model.you, score: h.score[0], serving: serveShown && h.server == 0, bar: h.extra?.bars[0], avatar: _avatarOf(model, 0)),
               SizedBox(
                 width: 190,
                 child: Column(
@@ -149,7 +150,7 @@ class _MatchHud extends StatelessWidget {
                       : [Text('PONG! ${game.title}', style: const TextStyle(fontSize: 18)), Text('${game.rules.winScore ?? 5}点先取', style: const TextStyle(fontSize: 14, color: Palette.pencil))],
                 ),
               ),
-              _ScoreBox(side: 1, you: model.you, score: h.score[1], serving: serveShown && h.server == 1, bar: h.extra?.bars[1]),
+              _ScoreBox(side: 1, you: model.you, score: h.score[1], serving: serveShown && h.server == 1, bar: h.extra?.bars[1], avatar: _avatarOf(model, 1)),
             ],
           ),
         ),
@@ -166,14 +167,23 @@ class _MatchHud extends StatelessWidget {
   }
 }
 
+/// 部屋の情報から選手の見た目と名前を取り出す（スマホ版 avatarOf / playerNameOf）
+Avatar _avatarOf(AppModel model, int side) => model.room?.players[side].look ?? Avatar.standard;
+
+String _nameOf(AppModel model, int side) {
+  final n = model.room?.players[side].name ?? '';
+  return n.isEmpty ? (side == model.you ? 'あなた' : 'あいて') : n;
+}
+
 class _ScoreBox extends StatelessWidget {
-  const _ScoreBox({required this.side, required this.you, required this.score, required this.serving, this.bar});
+  const _ScoreBox({required this.side, required this.you, required this.score, required this.serving, required this.avatar, this.bar});
 
   final int side;
   final int you;
   final int score;
   final bool serving;
   final double? bar;
+  final Avatar avatar;
 
   @override
   Widget build(BuildContext context) {
@@ -190,6 +200,8 @@ class _ScoreBox extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (side == 1) ball,
+              AvatarIcon(avatar: avatar, size: 34, onDark: me),
+              const SizedBox(width: 6),
               SizedBox(
                 width: 110,
                 child: Column(
@@ -278,11 +290,13 @@ class _ControlStrip extends StatelessWidget {
     final model = Services.of(context).model;
     final h = model.feed.hud;
     final myServe = h.phase == MatchPhase.play && h.serving && h.server == model.you && h.resumeCount <= 0;
-    return SizedBox(
-      height: 58,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 58),
       child: CustomPaint(
         painter: SketchBorderPainter(seed: 111, dashed: !myServe, shadow: false, fillColor: myServe ? Palette.ink : Palette.paper, strokeWidth: 2),
-        child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Center(
           child: myServe
               ? const Text('あなたのサーブ！ J で打つ', style: TextStyle(fontSize: 22, color: Palette.paper))
               : Wrap(
@@ -293,6 +307,7 @@ class _ControlStrip extends StatelessWidget {
                       Row(mainAxisSize: MainAxisSize.min, children: [Keycap(c.key, size: 13), const SizedBox(width: 6), Text(c.label, style: const TextStyle(fontSize: 15))]),
                   ],
                 ),
+          ),
         ),
       ),
     );
@@ -339,6 +354,15 @@ class _Overlays extends StatelessWidget {
         const SizedBox(height: 6),
         Text('あなたは${model.you == 0 ? '左' : '右'}の選手（太い線・「あなた」）', style: const TextStyle(fontSize: 17)),
         Text(game.ruleText, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, color: Palette.pencil)),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _Fighter(avatar: _avatarOf(model, 0), name: _nameOf(model, 0), caption: '${model.you == 0 ? 'あなた' : 'あいて'}・左'),
+            const Padding(padding: EdgeInsets.symmetric(horizontal: 14), child: Text('VS', style: TextStyle(fontSize: 26))),
+            _Fighter(avatar: _avatarOf(model, 1), name: _nameOf(model, 1), caption: '${model.you == 1 ? 'あなた' : 'あいて'}・右'),
+          ],
+        ),
         const SizedBox(height: 8),
         ControlsList(controls: game.controls, size: 17),
         Text('${math.max(1, h.count)}', style: const TextStyle(fontSize: 72, height: 1.1)),
@@ -404,15 +428,14 @@ class ResultScreen extends StatelessWidget {
             children: [
               Text('PONG! ${r.game.title}', style: const TextStyle(fontSize: 20)),
               const SizedBox(height: 8),
-              AvatarView(avatar: me.look, size: 120, mood: h.winner == -1 ? AvatarMood.normal : (won ? AvatarMood.win : AvatarMood.lose)),
               Transform.rotate(angle: -0.035, child: Text(title, style: const TextStyle(fontSize: 60, height: 1.2))),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  _FinalScore(label: '${r.you == 0 ? 'あなた' : 'あいて'}・左', score: h.score[0], isMe: r.you == 0),
+                  _FinalScore(label: '${_nameOf(model, 0)}・左', score: h.score[0], isMe: r.you == 0, avatar: r.players[0].look, mood: _mood(h.winner, 0)),
                   const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Text('-', style: TextStyle(fontSize: 48))),
-                  _FinalScore(label: '${r.you == 1 ? 'あなた' : 'あいて'}・右', score: h.score[1], isMe: r.you == 1),
+                  _FinalScore(label: '${_nameOf(model, 1)}・右', score: h.score[1], isMe: r.you == 1, avatar: r.players[1].look, mood: _mood(h.winner, 1)),
                 ],
               ),
               Text('${h.endReason ?? ''}${r.game.scoreUnit == null ? '' : '（${r.game.scoreUnit}の数）'}', style: const TextStyle(fontSize: 18, color: Palette.pencil)),
@@ -444,15 +467,42 @@ class ResultScreen extends StatelessWidget {
   }
 }
 
+AvatarMood _mood(int? winner, int side) => winner == null || winner == -1 ? AvatarMood.normal : (winner == side ? AvatarMood.win : AvatarMood.lose);
+
+/// 試合前の「VS」に並べる選手（スマホ版 _Fighter）
+class _Fighter extends StatelessWidget {
+  const _Fighter({required this.avatar, required this.name, required this.caption});
+  final Avatar avatar;
+  final String name;
+  final String caption;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 130,
+      child: Column(
+        children: [
+          AvatarView(avatar: avatar, size: 64),
+          Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16)),
+          Text(caption, style: const TextStyle(fontSize: 13, color: Palette.pencil, height: 1)),
+        ],
+      ),
+    );
+  }
+}
+
 class _FinalScore extends StatelessWidget {
-  const _FinalScore({required this.label, required this.score, required this.isMe});
+  const _FinalScore({required this.label, required this.score, required this.isMe, required this.avatar, required this.mood});
   final String label;
   final int score;
   final bool isMe;
+  final Avatar avatar;
+  final AvatarMood mood;
 
   @override
   Widget build(BuildContext context) {
     return Column(children: [
+      AvatarView(avatar: avatar, size: 110, mood: mood),
       Text(label, style: const TextStyle(fontSize: 17)),
       Text('$score', style: TextStyle(fontSize: 64, height: 1.1, decoration: isMe ? TextDecoration.underline : null)),
     ]);
