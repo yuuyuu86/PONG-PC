@@ -1,0 +1,22 @@
+# OS / エディタ
+.DS_Store
+*.swp
+.idea/
+*.iml
+.vscode/
+xcuserdata/
+*.xcuserstate
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+coverage/
+
+# macOS / Windows のビルドで作られるもの
+macos/Flutter/ephemeral/
+windows/flutter/ephemeral/
+**/Pods/

@@ -1,0 +1,50 @@
+# テストと、Windows（x64）/ Mac（Apple シリコン + Intel のユニバーサル）版のビルド。
+# できあがったアプリは各ジョブの Artifacts からダウンロードできる。
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.6
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.6
+      - run: flutter pub get
+      - run: flutter test test/game_test.dart test/network_test.dart
+      - run: flutter build windows --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PONG-windows-x64
+          path: build/windows/x64/runner/Release/
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.6
+      - run: flutter pub get
+      - run: ./tool/build_macos.sh
+      - run: ditto -c -k --keepParent "build/macos/Build/Products/Release/PONG!.app" PONG-macos-universal.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PONG-macos-universal
+          path: PONG-macos-universal.zip
