@@ -77,69 +77,86 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final problem = _problem;
     final preview = _name.text.trim();
+    final identity = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const DoodleHeading('プレイヤー登録'),
+        const SizedBox(height: 10),
+        const Text('あなたの名前と見た目を決めてください。\n対戦するとき、相手の画面に表示されます。', style: TextStyle(fontSize: 17, height: 1.45)),
+        const SizedBox(height: 20),
+        DoodleTextField(
+          controller: _name,
+          hint: '名前 (${AppSettings.maxNameLength}文字まで)',
+          maxLength: AppSettings.maxNameLength,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 26, color: Palette.ink),
+          onChanged: (_) => setState(() => _touched = true),
+          onSubmitted: (_) => _start(),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 26,
+          child: _touched && problem != null
+              ? Semantics(liveRegion: true, child: StatusLine(state: StatusKind.bad, text: problem))
+              : Text('${preview.characters.length} / ${AppSettings.maxNameLength}', textAlign: TextAlign.end, style: const TextStyle(fontSize: 15, color: Palette.pencil)),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: DoodleButton(
+            label: '名前をおまかせ', icon: Icons.casino_outlined, fontSize: 17, seed: 161,
+            onPressed: () {
+              final n = AppSettings.suggestName();
+              _name.value = TextEditingValue(text: n, selection: TextSelection.collapsed(offset: n.length));
+              setState(() => _touched = true);
+            },
+          ),
+        ),
+        const SizedBox(height: 30),
+        DoodleBox(
+          seed: 162, dashed: true,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('相手の画面ではこう見えます', style: TextStyle(fontSize: 15, color: Palette.pencil)),
+            const SizedBox(height: 8),
+            PlayerTag(avatar: _avatar, name: preview.isEmpty ? '―' : preview, trailing: '(接続中)'),
+          ]),
+        ),
+      ],
+    );
+    final action = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 24),
+        DoodleButton(label: 'はじめる', icon: Icons.arrow_forward_rounded, primary: true, seed: 163, onPressed: problem == null ? _start : null),
+        const SizedBox(height: 12),
+        const Text('名前と見た目は、あとからトップ画面で変えられます。', textAlign: TextAlign.center, style: TextStyle(fontSize: 15, color: Palette.pencil)),
+      ],
+    );
+    final appearance = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const DoodleHeading('みため'),
+        const SizedBox(height: 12),
+        AvatarEditor(value: _avatar, onChanged: (a) => setState(() => _avatar = a)),
+      ],
+    );
     return DoodleScaffold(
       showBack: false,
       child: PageBody(
-        maxWidth: 640,
+        maxWidth: 1040,
         children: [
-          const Text('ようこそ！', textAlign: TextAlign.center, style: TextStyle(fontSize: 22)),
-          const Text('PONG!', textAlign: TextAlign.center, style: TextStyle(fontSize: 64, height: 1.1, letterSpacing: 4)),
-          const SizedBox(height: 18),
-          const DoodleHeading('プレイヤー登録'),
-          const SizedBox(height: 10),
-          const Text('あなたの名前と見た目を決めてください。\n対戦するとき、相手の画面に表示されます。', style: TextStyle(fontSize: 17, height: 1.45)),
-          const SizedBox(height: 16),
-          DoodleTextField(
-            controller: _name,
-            hint: '名前 (${AppSettings.maxNameLength}文字まで)',
-            maxLength: AppSettings.maxNameLength,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 26, color: Palette.ink),
-            onChanged: (_) => setState(() => _touched = true),
-            onSubmitted: (_) => _start(),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 26,
-            child: _touched && problem != null
-                ? StatusLine(state: StatusKind.bad, text: problem)
-                : Text('${preview.characters.length} / ${AppSettings.maxNameLength}', textAlign: TextAlign.end, style: const TextStyle(fontSize: 15, color: Palette.pencil)),
-          ),
-          Align(
-            child: DoodleButton(
-              label: '名前をおまかせ',
-              icon: Icons.casino_outlined,
-              fontSize: 17,
-              seed: 161,
-              onPressed: () {
-                final n = AppSettings.suggestName();
-                _name.value = TextEditingValue(text: n, selection: TextSelection.collapsed(offset: n.length));
-                setState(() => _touched = true);
-              },
-            ),
-          ),
-          const SizedBox(height: 26),
-          const DoodleHeading('みため'),
-          const SizedBox(height: 12),
-          AvatarEditor(value: _avatar, onChanged: (a) => setState(() => _avatar = a)),
-          const SizedBox(height: 22),
-          // 部屋の画面での表示と同じ形で、相手にどう見えるかを見せる
-          DoodleBox(
-            seed: 162,
-            dashed: true,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('相手の画面ではこう見えます', style: TextStyle(fontSize: 15, color: Palette.pencil)),
-                const SizedBox(height: 8),
-                PlayerTag(avatar: _avatar, name: preview.isEmpty ? '―' : preview, trailing: '(接続中)'),
-              ],
-            ),
-          ),
+          const Text('ようこそ！', textAlign: TextAlign.center, style: TextStyle(fontSize: 20)),
+          const Text('PONG!', textAlign: TextAlign.center, style: TextStyle(fontSize: 56, height: 1.1, letterSpacing: 4)),
           const SizedBox(height: 24),
-          DoodleButton(label: 'はじめる', icon: Icons.arrow_forward_rounded, primary: true, seed: 163, onPressed: problem == null ? _start : null),
-          const SizedBox(height: 12),
-          const Text('名前と見た目は、あとからトップ画面で変えられます。', textAlign: TextAlign.center, style: TextStyle(fontSize: 15, color: Palette.pencil)),
+          LayoutBuilder(builder: (context, constraints) {
+            if (constraints.maxWidth < 760) {
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [identity, const SizedBox(height: 32), appearance, action]);
+            }
+            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [identity, action])),
+              const SizedBox(width: 56),
+              Expanded(child: appearance),
+            ]);
+          }),
         ],
       ),
     );
