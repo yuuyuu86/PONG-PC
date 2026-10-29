@@ -11,7 +11,7 @@ enum PeerState { idle, host, full, busy }
 
 /// 同じWi-Fiにいる PONG! のPC
 class Peer {
-  Peer({required this.id, required this.name, required this.avatar, required this.state, this.code, this.game, required this.address, required this.port, required this.lastSeen});
+  Peer({required this.id, required this.name, required this.avatar, required this.state, this.code, this.game, required this.fingerprint, required this.address, required this.port, required this.lastSeen});
 
   final String id;
   final String name;
@@ -19,11 +19,12 @@ class Peer {
   final PeerState state;
   final String? code;
   final GameKind? game;
+  final String fingerprint;
   final InternetAddress address;
   final int port;
   final DateTime lastSeen;
 
-  bool sameAs(Peer o) => o.id == id && o.name == name && o.avatar == avatar && o.state == state && o.code == code && o.game == game && o.port == port;
+  bool sameAs(Peer o) => o.id == id && o.name == name && o.avatar == avatar && o.state == state && o.code == code && o.game == game && o.fingerprint == fingerprint && o.port == port;
 }
 
 enum DiscoveryStatus { starting, ready, failed }
@@ -35,7 +36,7 @@ class Discovery extends ChangeNotifier {
   Discovery({this.udpPort = defaultPort, this.interval = const Duration(seconds: 1), this.loopbackOnly = false});
 
   static const defaultPort = 47521;
-  static const _magic = 'pong-pc/1';
+  static const _magic = 'pong-pc/2';
 
   final int udpPort;
   final Duration interval;
@@ -66,8 +67,8 @@ class Discovery extends ChangeNotifier {
   var _advert = <String, Object?>{};
   List<InternetAddress> _targets = [InternetAddress('255.255.255.255')];
 
-  Future<void> start({required String name, required String avatar, required int tcpPort}) async {
-    _advert = {'m': _magic, 'id': myId, 'name': name, 'avatar': avatar, 'state': PeerState.idle.name, 'port': tcpPort};
+  Future<void> start({required String name, required String avatar, required int tcpPort, required String fingerprint}) async {
+    _advert = {'m': _magic, 'id': myId, 'name': name, 'avatar': avatar, 'state': PeerState.idle.name, 'port': tcpPort, 'fp': fingerprint};
     try {
       // 同じPCで2つ起動しても受け取れるよう、ポートを共有する（Windows は reuseAddress で共有できる）
       final s = await RawDatagramSocket.bind(InternetAddress.anyIPv4, udpPort, reuseAddress: true, reusePort: !Platform.isWindows);
@@ -197,6 +198,8 @@ class Discovery extends ChangeNotifier {
         final m = jsonDecode(utf8.decode(d!.data));
         if (m is! Map || m['m'] != _magic || m['id'] == myId) continue;
         final id = m['id'] as String;
+        final fingerprint = m['fp'];
+        if (fingerprint is! String || !RegExp(r'^[0-9a-f]{64}$').hasMatch(fingerprint)) continue;
         final peer = Peer(
           id: id,
           name: (m['name'] as String?) ?? 'PC',
@@ -204,6 +207,7 @@ class Discovery extends ChangeNotifier {
           state: PeerState.values.asNameMap()[m['state']] ?? PeerState.busy,
           code: m['code'] as String?,
           game: GameKind.values.asNameMap()[m['game']],
+          fingerprint: fingerprint,
           // 同じPCから届いたお知らせ（127.0.0.1 経由など）でも、そのアドレスでつながる
           address: d.address,
           port: (m['port'] as num).toInt(),

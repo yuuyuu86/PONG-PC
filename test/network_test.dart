@@ -9,6 +9,7 @@ import 'package:pong_pc/games/core/match.dart';
 import 'package:pong_pc/games/fencing/fencing.dart';
 import 'package:pong_pc/net/discovery.dart';
 import 'package:pong_pc/net/link.dart';
+import 'package:pong_pc/net/peer_identity.dart';
 import 'package:pong_pc/net/sessions.dart';
 import 'package:pong_pc/net/wire.dart';
 
@@ -49,21 +50,26 @@ Future<void> waitUntil(String label, bool Function() cond, {Duration timeout = c
 }
 
 void main() {
-  late ServerSocket server;
+  late SecureServerSocket server;
   late HostSession host;
+  late PeerIdentity identity;
   final lo = InternetAddress.loopbackIPv4;
 
   /// ループバックで待ち受け、届いた接続の最初のメッセージを振り分ける（アプリの AppModel と同じ）
   Future<void> listen() async {
-    server = await ServerSocket.bind(lo, 0);
+    server = await SecureServerSocket.bind(lo, 0, identity.context);
     server.listen((s) {
       final link = Link(s);
       link.onMessage = (m) {
         link.onMessage = null;
         if (m['t'] == 'join') host.handleJoin(link, m);
       };
-    });
+    }, onError: (_) {});
   }
+
+  setUpAll(() async {
+    identity = await PeerIdentity.create();
+  });
 
   tearDown(() async {
     host.leave();
@@ -78,11 +84,11 @@ void main() {
 
     // 間違ったコードでは入れない
     final wrong = GuestSession(code: 'ZZZZ', me: const Profile('まちがい', ''), listener: guestRec, findHost: (_) => null);
-    await wrong.connect(lo, port);
+    await wrong.connect(lo, port, fingerprint: identity.fingerprint);
     await waitUntil('not_found', () => guestRec.failures.contains('not_found'));
 
-    final guest = GuestSession(code: host.code, me: const Profile('ゲスト', '1.1.1.1'), listener: guestRec, findHost: (_) => (lo, port));
-    await guest.connect(lo, port);
+    final guest = GuestSession(code: host.code, me: const Profile('ゲスト', '1.1.1.1'), listener: guestRec, findHost: (_) => (lo, port, identity.fingerprint));
+    await guest.connect(lo, port, fingerprint: identity.fingerprint);
     await waitUntil('参加', () => guestRec.joined == 1 && hostRec.room?.players[1].present == true);
     expect(guestRec.room?.you, 1);
     expect(hostRec.room?.players[1].name, 'ゲスト');
@@ -90,7 +96,7 @@ void main() {
 
     // 3人目は満員
     final third = Recorder();
-    await GuestSession(code: host.code, me: const Profile('3人目', ''), listener: third, findHost: (_) => null).connect(lo, port);
+    await GuestSession(code: host.code, me: const Profile('3人目', ''), listener: third, findHost: (_) => null).connect(lo, port, fingerprint: identity.fingerprint);
     await waitUntil('full', () => third.failures.contains('full'));
 
     // 片方だけ準備OKでは始まらない
@@ -145,10 +151,21 @@ void main() {
     host = HostSession(game: GameKind.volley, me: const Profile('ホスト', ''), listener: hostRec);
     await listen();
     final guest = GuestSession(code: host.code, me: const Profile('ゲスト', ''), listener: guestRec, findHost: (_) => null);
-    await guest.connect(lo, server.port);
+    await guest.connect(lo, server.port, fingerprint: identity.fingerprint);
     await waitUntil('参加', () => guestRec.joined == 1);
     host.leave();
     await waitUntil('閉じた', () => guestRec.ended.contains('closed'));
+  });
+
+  test('TLS証明書の指紋が一致しない接続を拒否する', () async {
+    server = await SecureServerSocket.bind(lo, 0, identity.context);
+    final link = await Link.connect(
+      lo,
+      server.port,
+      expectedFingerprint: List.filled(64, '0').join(),
+      timeout: const Duration(seconds: 2),
+    );
+    expect(link, isNull);
   });
 
   test('紙飛行機の招待: 受け取って「参加する」とその接続のまま部屋に入る', () async {
@@ -156,7 +173,7 @@ void main() {
     host = HostSession(game: GameKind.badminton, me: const Profile('ホスト', ''), listener: hostRec);
     await listen();
     // 招待される側の待ち受け
-    final inviteeServer = await ServerSocket.bind(lo, 0);
+    final inviteeServer = await SecureServerSocket.bind(lo, 0, identity.context);
     final got = Completer<(Msg, Link)>();
     inviteeServer.listen((s) {
       final link = Link(s);
@@ -165,7 +182,7 @@ void main() {
         got.complete((m, link));
       };
     });
-    await host.sendInvite(address: lo, port: inviteeServer.port, peerName: 'ゲスト', y: 0.4, delay: 1.2);
+    await host.sendInvite(address: lo, port: inviteeServer.port, fingerprint: identity.fingerprint, peerName: 'ゲスト', y: 0.4, delay: 1.2);
     final (msg, link) = await got.future.timeout(const Duration(seconds: 5));
     expect(msg['t'], 'invite');
     expect(msg['code'], host.code);
@@ -182,8 +199,8 @@ void main() {
     await listen();
     final a = Discovery(udpPort: 47599, interval: const Duration(milliseconds: 200));
     final b = Discovery(udpPort: 47599, interval: const Duration(milliseconds: 200));
-    await a.start(name: 'えー', avatar: '', tcpPort: 1111);
-    await b.start(name: 'びー', avatar: '', tcpPort: 2222);
+    await a.start(name: 'えー', avatar: '', tcpPort: 1111, fingerprint: identity.fingerprint);
+    await b.start(name: 'びー', avatar: '', tcpPort: 2222, fingerprint: identity.fingerprint);
     await waitUntil('発見', () => a.peers.any((p) => p.name == 'びー') && b.peers.any((p) => p.name == 'えー'));
     b.advertise(name: 'びー', avatar: '', state: PeerState.host, code: 'KQTE', game: GameKind.boxing);
     await waitUntil('部屋の広告', () => a.peerWithCode('KQTE')?.port == 2222);
@@ -198,8 +215,8 @@ void main() {
     // 共有ポート宛ての 127.0.0.1 は片方にしか届かない。届いた側が相手専用のポートへ返事をする
     final a = Discovery(udpPort: 47598, interval: const Duration(milliseconds: 200), loopbackOnly: true);
     final b = Discovery(udpPort: 47598, interval: const Duration(milliseconds: 200), loopbackOnly: true);
-    await a.start(name: 'えー', avatar: '', tcpPort: 1111);
-    await b.start(name: 'びー', avatar: '', tcpPort: 2222);
+    await a.start(name: 'えー', avatar: '', tcpPort: 1111, fingerprint: identity.fingerprint);
+    await b.start(name: 'びー', avatar: '', tcpPort: 2222, fingerprint: identity.fingerprint);
     await waitUntil('発見', () => a.peers.any((p) => p.name == 'びー') && b.peers.any((p) => p.name == 'えー'));
     a.dispose();
     b.dispose();

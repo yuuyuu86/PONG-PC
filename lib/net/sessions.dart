@@ -56,7 +56,7 @@ class _Guest {
 class HostSession {
   HostSession({required this.game, required Profile me, required this.listener, math.Random? random})
       : _me = me,
-        _random = random ?? math.Random() {
+        _random = random ?? math.Random.secure() {
     code = RoomCode.make(_random.nextInt);
     _heartbeat = Timer.periodic(const Duration(seconds: 1), (_) {
       _guest?.link?.checkAlive(Duration(seconds: phase == RoomPhase.match ? 3 : 6));
@@ -128,7 +128,7 @@ class HostSession {
   }
 
   void _admit(Link link, String name, String avatar) {
-    final token = List.generate(16, (_) => _random.nextInt(16).toRadixString(16)).join();
+    final token = List.generate(64, (_) => _random.nextInt(16).toRadixString(16)).join();
     _guest = _Guest(link, name, avatar, token);
     _notice = null;
     _attach(link);
@@ -151,8 +151,8 @@ class HostSession {
 
   // 招待（紙飛行機） ------------------------------------------------------
 
-  Future<void> sendInvite({required InternetAddress address, required int port, required String peerName, required double y, required double delay}) async {
-    final link = await Link.connect(address, port);
+  Future<void> sendInvite({required InternetAddress address, required int port, required String fingerprint, required String peerName, required double y, required double delay}) async {
+    final link = await Link.connect(address, port, expectedFingerprint: fingerprint);
     if (link == null) {
       listener.inviteDeclined(peerName);
       return;
@@ -383,7 +383,7 @@ class HostSession {
 // ---------------------------------------------------------------------------
 // ゲスト（参加したPC）。入力を送り、届いた状態を表示する。切れたら自動で再接続する。
 
-typedef HostFinder = (InternetAddress, int)? Function(String code);
+typedef HostFinder = (InternetAddress, int, String)? Function(String code);
 
 class GuestSession {
   GuestSession({required this.code, required Profile me, required this.listener, required this.findHost}) : _me = me {
@@ -408,9 +408,9 @@ class GuestSession {
   int _ticks = 0;
 
   /// 部屋コードで参加
-  Future<void> connect(InternetAddress host, int port) async {
+  Future<void> connect(InternetAddress host, int port, {required String fingerprint}) async {
     _connecting = true;
-    final l = await Link.connect(host, port);
+    final l = await Link.connect(host, port, expectedFingerprint: fingerprint);
     _connecting = false;
     if (_leaving) {
       l?.close();
@@ -503,7 +503,7 @@ class GuestSession {
     // 部屋コードを知らせているPCを探してつなぎ直す
     if (_ticks % 6 == 0) {
       final h = findHost(code);
-      if (h != null) connect(h.$1, h.$2);
+      if (h != null) connect(h.$1, h.$2, fingerprint: h.$3);
     }
   }
 

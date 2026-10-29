@@ -1,27 +1,52 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:basic_utils/basic_utils.dart';
+
 import 'wire.dart';
 
 /// 相手のPCとの1本の TCP 接続
 class Link {
   Link(this._socket) {
     try {
-      _socket.setOption(SocketOption.tcpNoDelay, true); // 小さなメッセージをすぐ送る（入力の遅れを減らす）
+      _socket.setOption(
+        SocketOption.tcpNoDelay,
+        true,
+      ); // 小さなメッセージをすぐ送る（入力の遅れを減らす）
     } catch (_) {}
-    _sub = _socket.listen(_onData, onError: (_) => close(), onDone: close, cancelOnError: true);
+    _sub = _socket.listen(
+      _onData,
+      onError: (_) => close(),
+      onDone: close,
+      cancelOnError: true,
+    );
   }
 
   /// つなぐ。timeout 以内につながらなければ null。
-  static Future<Link?> connect(InternetAddress host, int port, {Duration timeout = const Duration(seconds: 5)}) async {
+  static Future<Link?> connect(
+    InternetAddress host,
+    int port, {
+    required String expectedFingerprint,
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    Socket? socket;
     try {
-      return Link(await Socket.connect(host, port, timeout: timeout));
+      socket = await Socket.connect(host, port, timeout: timeout);
+      final secure = await SecureSocket.secure(
+        socket,
+        context: SecurityContext(withTrustedRoots: false),
+        onBadCertificate: (certificate) =>
+            CryptoUtils.getHash(certificate.der).toLowerCase() ==
+            expectedFingerprint.toLowerCase(),
+      ).timeout(timeout);
+      return Link(secure);
     } catch (_) {
+      socket?.destroy();
       return null;
     }
   }
 
-  final Socket _socket;
+  final SecureSocket _socket;
   late final StreamSubscription<List<int>> _sub;
   final _decoder = WireDecoder();
   void Function(Msg)? onMessage;

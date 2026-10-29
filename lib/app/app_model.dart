@@ -9,6 +9,7 @@ import '../games/core/painting.dart';
 import '../games/rally/rally.dart';
 import '../net/discovery.dart';
 import '../net/link.dart';
+import '../net/peer_identity.dart';
 import '../net/sessions.dart';
 import '../net/wire.dart';
 import 'feedback.dart';
@@ -167,7 +168,8 @@ class AppModel extends ChangeNotifier implements SessionListener {
 
   HostSession? host;
   GuestSession? guest;
-  ServerSocket? _server;
+  SecureServerSocket? _server;
+  PeerIdentity? _identity;
   int? _lastIntroCount;
 
   Profile get profile => Profile(settings.playerName, settings.avatar.encode());
@@ -177,13 +179,18 @@ class AppModel extends ChangeNotifier implements SessionListener {
   Future<void> start() async {
     try {
       // 相手からの接続（参加・招待・再接続）を待ち受ける。ポートは空いているものを自動で使う
-      final s = await ServerSocket.bind(InternetAddress.anyIPv4, 0);
-      s.listen(_incoming);
+      final identity = await PeerIdentity.create();
+      _identity = identity;
+      final s = await SecureServerSocket.bind(InternetAddress.anyIPv4, 0, identity.context);
+      s.listen(_incoming, onError: (_) {});
       _server = s;
     } catch (e) {
       listenError = '$e';
     }
-    await discovery.start(name: profile.name, avatar: profile.avatar, tcpPort: _server?.port ?? 0);
+    final identity = _identity;
+    if (identity != null) {
+      await discovery.start(name: profile.name, avatar: profile.avatar, tcpPort: _server?.port ?? 0, fingerprint: identity.fingerprint);
+    }
     settings.addListener(_profileChanged);
     notifyListeners();
   }
@@ -260,7 +267,7 @@ class AppModel extends ChangeNotifier implements SessionListener {
       guest = g;
       _advertise();
       notifyListeners();
-      g.connect(peer.address, peer.port);
+      g.connect(peer.address, peer.port, fingerprint: peer.fingerprint);
       return;
     }
     if (tries <= 0) {
@@ -273,9 +280,9 @@ class AppModel extends ChangeNotifier implements SessionListener {
     Timer(const Duration(milliseconds: 250), () => _findRoom(code, tries - 1));
   }
 
-  (InternetAddress, int)? _findHost(String code) {
+  (InternetAddress, int, String)? _findHost(String code) {
     final p = discovery.peerWithCode(code);
-    return p == null ? null : (p.address, p.port);
+    return p == null ? null : (p.address, p.port, p.fingerprint);
   }
 
   static String refusalText(String reason) => switch (reason) {
@@ -330,7 +337,7 @@ class AppModel extends ChangeNotifier implements SessionListener {
     final flight = Flight(outbound: true, from: from, yFrac: yFrac);
     flights.add(flight);
     final delay = PlaneMotion.outCrossTime(from, window, yFrac);
-    h.sendInvite(address: peer.address, port: peer.port, peerName: peer.name, y: yFrac, delay: delay);
+    h.sendInvite(address: peer.address, port: peer.port, fingerprint: peer.fingerprint, peerName: peer.name, y: yFrac, delay: delay);
     inviteStatus = '${peer.name} に紙飛行機を飛ばしました。返事を待っています…';
     notifyListeners();
     Timer(Duration(milliseconds: ((PlaneMotion.outTotal + 0.8) * 1000).round()), () {
@@ -399,7 +406,7 @@ class AppModel extends ChangeNotifier implements SessionListener {
 
   // 届いた接続の振り分け --------------------------------------------------
 
-  void _incoming(Socket socket) {
+  void _incoming(SecureSocket socket) {
     final link = Link(socket);
     final timeout = Timer(const Duration(seconds: 10), () {
       if (link.onMessage != null) link.close();
