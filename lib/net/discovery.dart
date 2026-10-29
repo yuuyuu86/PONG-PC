@@ -56,6 +56,12 @@ class Discovery extends ChangeNotifier {
   /// 同じPCで2つ起動したときも、共有ポート宛ての 127.0.0.1 は片方にしか届かないので、これで補う。
   RawDatagramSocket? _direct;
   final _lastReply = <String, DateTime>{};
+
+  /// お知らせを送るだけの UDP（送り先ごとに1つ）。受け取り用とは分ける。
+  /// ブロードキャストを許さないネットワークでは送信が失敗し、そのソケットが使えなくなることがあるため、
+  /// 失敗したら作り直し、受け取り用のソケットには影響させない。
+  final _senders = <String, RawDatagramSocket>{};
+  final _opening = <String>{};
   Timer? _timer;
   var _advert = <String, Object?>{};
   List<InternetAddress> _targets = [InternetAddress('255.255.255.255')];
@@ -92,7 +98,6 @@ class Discovery extends ChangeNotifier {
       (e) {
         if (e == RawSocketEvent.read) _receive(s);
       },
-      // ブロードキャストが許されないネットワークでは送信の失敗がここに届く。探すのは続ける
       onError: (Object _) {},
     );
   }
@@ -125,14 +130,51 @@ class Discovery extends ChangeNotifier {
   }
 
   void _beacon() {
-    final s = _socket;
-    if (s == null) return;
+    if (_socket == null) return;
     final data = utf8.encode(jsonEncode(_advert));
     for (final t in _targets) {
+      final sender = _senders[t.address];
+      if (sender == null) {
+        _openSender(t.address);
+        continue;
+      }
       try {
-        s.send(data, t, udpPort);
-      } catch (_) {}
+        sender.send(data, t, udpPort);
+      } catch (_) {
+        _dropSender(t.address);
+      }
     }
+  }
+
+  Future<void> _openSender(String target) async {
+    if (!_opening.add(target)) return;
+    try {
+      final s = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+      s.broadcastEnabled = true;
+      // 送信の失敗はここに届く。次のお知らせのときに作り直す
+      s.listen((_) {}, onError: (Object _) => _dropSender(target), onDone: () => _dropSender(target));
+      if (_timer == null) {
+        s.close();
+      } else {
+        _senders[target] = s;
+        try {
+          s.send(utf8.encode(jsonEncode(_advert)), InternetAddress(target), udpPort);
+        } catch (_) {
+          _dropSender(target);
+        }
+      }
+    } catch (_) {
+      // 送れない送り先はあきらめて、次の機会にまた試す
+    } finally {
+      _opening.remove(target);
+    }
+  }
+
+  void _dropSender(String target) {
+    final s = _senders.remove(target);
+    try {
+      s?.close();
+    } catch (_) {}
   }
 
   /// 相手専用の UDP へ自分のお知らせを直接返す（同じ相手には間隔をあけて）
@@ -194,6 +236,10 @@ class Discovery extends ChangeNotifier {
   @override
   void dispose() {
     _timer?.cancel();
+    _timer = null;
+    for (final t in [..._senders.keys]) {
+      _dropSender(t);
+    }
     _socket?.close();
     _direct?.close();
     super.dispose();
