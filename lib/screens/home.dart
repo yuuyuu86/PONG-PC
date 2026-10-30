@@ -55,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
           tilt: -0.025,
           onPressed: () => model.go(Screen.create),
         ),
-        const _Hook(),
+        const SizedBox(height: 26),
         ModeCard(
           label: 'コードで参加',
           caption: '相手の 4文字コードを入れる',
@@ -67,7 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
             model.go(Screen.join);
           },
         ),
-        const _Hook(),
+        const SizedBox(height: 26),
         ListenableBuilder(
           listenable: model.discovery,
           builder: (context, _) {
@@ -81,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
               tilt: -0.015,
               onPressed: () {
                 model.joinMessage = null;
-                model.go(Screen.join);
+                model.go(Screen.nearby);
               },
             );
           },
@@ -114,9 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final side = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Align(alignment: Alignment.centerRight, child: PongLogo(fontSize: 64)),
-        const Text('PC 2台で あそぶ 1たい1', textAlign: TextAlign.right, style: TextStyle(fontSize: 18)),
-        const SizedBox(height: 18),
+        const SizedBox(height: 12),
         const _NearbyPanel(),
         const SizedBox(height: 18),
         for (final (i, (label, icon, screen)) in const [
@@ -133,6 +131,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
       ],
     );
+    const logo = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        PongLogo(fontSize: 64),
+        Text('PC 2台で あそぶ 1たい1', style: TextStyle(fontSize: 18)),
+      ],
+    );
     return DoodleScaffold(
       showBack: false,
       child: MouseRegion(
@@ -140,14 +145,32 @@ class _HomeScreenState extends State<HomeScreen> {
         child: LayoutBuilder(builder: (context, c) {
           // 狭いウィンドウや大きな文字では、上から順に並べてスクロールする
           if (c.maxWidth < 900 || c.maxHeight < 560 || MediaQuery.textScalerOf(context).scale(1) > 1.3) {
-            return PageBody(children: [side, const SizedBox(height: 24), modes, const SizedBox(height: 24), SizedBox(height: 320, child: figure)]);
+            return PageBody(children: [logo, side, const SizedBox(height: 24), modes, const SizedBox(height: 24), SizedBox(height: 320, child: figure)]);
           }
           return Padding(
             padding: const EdgeInsets.fromLTRB(28, 4, 28, 24),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SizedBox(width: c.maxWidth * 0.32, child: Center(child: SingleChildScrollView(child: modes))),
+                SizedBox(
+                  width: c.maxWidth * 0.32,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      logo,
+                      const SizedBox(height: 16),
+                      // 看板: 2本の棒を地面まで立て、その上に札をかける
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            const Positioned.fill(child: CustomPaint(painter: _PostPainter())),
+                            SingleChildScrollView(padding: const EdgeInsets.only(top: 12, bottom: 40), child: modes),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: figure)),
                 SizedBox(width: c.maxWidth * 0.28, child: SingleChildScrollView(child: side)),
               ],
@@ -255,24 +278,24 @@ class _ModeCardState extends State<ModeCard> {
   }
 }
 
-/// 札どうしをつなぐ小さな金具
-class _Hook extends StatelessWidget {
-  const _Hook();
-
-  @override
-  Widget build(BuildContext context) => const SizedBox(height: 26, child: CustomPaint(painter: _HookPainter()));
-}
-
-class _HookPainter extends CustomPainter {
-  const _HookPainter();
+/// 看板の2本の棒（札の後ろを通って地面まで）と、足もとの草
+class _PostPainter extends CustomPainter {
+  const _PostPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final x = size.width * 0.3;
-    final pen = Sketch.pen(2.4);
-    canvas
-      ..drawPath(Sketch.line(Offset(x, 0), Offset(x, size.height), seed: 7), pen)
-      ..drawPath(Sketch.line(Offset(x + 14, 0), Offset(x + 14, size.height), seed: 8), pen);
+    final ground = size.height - 6;
+    final pen = Sketch.pen(2.6);
+    for (final (i, x) in [size.width * 0.22, size.width * 0.72].indexed) {
+      for (final dx in [-7.0, 7.0]) {
+        canvas.drawPath(Sketch.line(Offset(x + dx, 20), Offset(x + dx, ground), seed: 80 + i * 2 + (dx > 0 ? 1 : 0)), pen);
+      }
+      // 根元の草
+      for (final k in [-1.0, 1.0]) {
+        canvas.drawPath(Sketch.line(Offset(x + k * 12, ground), Offset(x + k * 20, ground - 12), seed: 90 + i), Sketch.pen(1.8));
+      }
+    }
+    canvas.drawPath(Sketch.line(Offset(0, ground), Offset(size.width, ground), seed: 95), Sketch.pen(2, color: Palette.pencil));
   }
 
   @override

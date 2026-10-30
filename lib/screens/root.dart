@@ -56,6 +56,7 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
           Screen.home => HomeScreen(),
           Screen.create => CreateScreen(),
           Screen.join => JoinScreen(),
+          Screen.nearby => JoinScreen(nearby: true),
           Screen.room => RoomScreen(),
           Screen.match => MatchScreen(),
           Screen.result => ResultScreen(),
