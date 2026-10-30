@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app/app_model.dart';
 import '../app/feedback.dart';
+import '../app/keyboard.dart';
 import '../app/services.dart';
 import '../games/core/catalog.dart';
 import '../ui/doodle.dart';
+import '../ui/logo.dart';
 import '../ui/widgets.dart';
 import 'root.dart';
 
@@ -139,7 +142,105 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 22),
+          const _KeySettings(),
         ],
+      ),
+    );
+  }
+}
+
+/// キーの割り当て。「変更」を押してから、使いたいキーを押す。
+class _KeySettings extends StatefulWidget {
+  const _KeySettings();
+
+  @override
+  State<_KeySettings> createState() => _KeySettingsState();
+}
+
+class _KeySettingsState extends State<_KeySettings> {
+  GameAction? _waiting;
+  final _focus = FocusNode();
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _start(GameAction a) {
+    setState(() => _waiting = a);
+    _focus.requestFocus();
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent e) {
+    final a = _waiting;
+    if (a == null || e is! KeyDownEvent) return a == null ? KeyEventResult.ignored : KeyEventResult.handled;
+    // Esc はやめる。Tab や修飾キーは画面の操作やショートカットに使うので割り当てない
+    if (e.logicalKey == LogicalKeyboardKey.escape) {
+      setState(() => _waiting = null);
+      return KeyEventResult.handled;
+    }
+    final reserved = {
+      LogicalKeyboardKey.tab, LogicalKeyboardKey.enter, LogicalKeyboardKey.metaLeft, LogicalKeyboardKey.metaRight, LogicalKeyboardKey.controlLeft,
+      LogicalKeyboardKey.controlRight, LogicalKeyboardKey.altLeft, LogicalKeyboardKey.altRight, LogicalKeyboardKey.capsLock,
+    };
+    if (reserved.contains(e.logicalKey)) return KeyEventResult.handled;
+    Services.of(context).settings.bindKey(a, e.physicalKey, KeyBindings.nameOf(e));
+    Services.of(context).feedback.play(Sound.tap);
+    setState(() => _waiting = null);
+    return KeyEventResult.handled;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = Services.of(context).settings;
+    return Focus(
+      focusNode: _focus,
+      onKeyEvent: _onKey,
+      child: DoodleBox(
+        seed: 84,
+        child: ListenableBuilder(
+          listenable: settings,
+          builder: (context, _) {
+            final keys = settings.keys;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const DoodleHeading('キーの割り当て', size: 21),
+                const SizedBox(height: 6),
+                const Text('「変更」を押してから、使いたいキーを押してください（Esc でやめる）。自分のPCだけに効きます。', style: TextStyle(fontSize: 15, color: Palette.pencil)),
+                const SizedBox(height: 10),
+                for (final (i, a) in GameAction.values.indexed)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 220, child: Text(a.label, style: const TextStyle(fontSize: 18))),
+                        Expanded(
+                          child: _waiting == a
+                              ? const Text('キーを押してください…', style: TextStyle(fontSize: 18))
+                              : Align(alignment: Alignment.centerLeft, child: Keycap(keys.label(a), size: 17)),
+                        ),
+                        SizedBox(
+                          width: 130,
+                          child: DoodleButton(label: _waiting == a ? 'やめる' : '変更', fontSize: 17, seed: 85 + i, onPressed: () => _waiting == a ? setState(() => _waiting = null) : _start(a)),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: SizedBox(
+                    width: 200,
+                    child: DoodleButton(label: '元に戻す', icon: Icons.restart_alt_rounded, fontSize: 17, seed: 90, onPressed: keys.isStandard ? null : settings.resetKeys),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

@@ -54,9 +54,10 @@ class _Guest {
 }
 
 class HostSession {
-  HostSession({required this.game, required Profile me, required this.listener, math.Random? random})
+  HostSession({required this.game, required Profile me, required this.listener, math.Random? random, int? rule})
       : _me = me,
-        _random = random ?? math.Random.secure() {
+        _random = random ?? math.Random.secure(),
+        rule = rule ?? game.defaultRule {
     code = RoomCode.make(_random.nextInt);
     _heartbeat = Timer.periodic(const Duration(seconds: 1), (_) {
       _guest?.link?.checkAlive(Duration(seconds: phase == RoomPhase.match ? 3 : 6));
@@ -66,6 +67,9 @@ class HostSession {
   static const tick = 1 / 60;
 
   final GameKind game;
+
+  /// 選んだルール（何点先取か、ボクシングは試合時間の秒数）
+  final int rule;
   final SessionListener listener;
   final math.Random _random;
   late final String code;
@@ -290,7 +294,7 @@ class HostSession {
   }
 
   void _startMatch() {
-    engine = MatchEngine(game, random: _random);
+    engine = MatchEngine(game, random: _random, rule: rule);
     phase = RoomPhase.match;
     _notice = null;
     _myReady = false;
@@ -370,6 +374,7 @@ class HostSession {
         g == null ? PlayerInfo.empty : PlayerInfo(present: true, name: g.name, avatar: g.avatar, connected: g.connected, ready: g.ready, rematch: g.rematch),
       ],
       notice: side == 0 ? _notice : null,
+      rule: rule,
     );
   }
 

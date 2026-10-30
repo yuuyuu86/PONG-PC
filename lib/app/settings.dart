@@ -1,9 +1,12 @@
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../avatar/avatar.dart';
+import 'keyboard.dart';
+import 'records.dart';
 
 /// このPCに保存する設定（スマホ版 AppSettings と同じ形）。
 class AppSettings extends ChangeNotifier {
@@ -66,6 +69,49 @@ class AppSettings extends ChangeNotifier {
 
   double get volume => _prefs.getDouble('volume') ?? 0.7;
   set volume(double v) => _set(() => _prefs.setDouble('volume', v));
+
+  /// キーの割り当て（'物理キーの番号|表示名'）
+  KeyBindings get keys {
+    final keys = <GameAction, PhysicalKeyboardKey>{};
+    final labels = <GameAction, String>{};
+    for (final a in GameAction.values) {
+      final raw = _prefs.getString('key_${a.name}')?.split('|');
+      final usage = raw == null ? null : int.tryParse(raw[0]);
+      if (usage == null || raw!.length < 2) continue;
+      keys[a] = PhysicalKeyboardKey(usage);
+      labels[a] = raw.sublist(1).join('|');
+    }
+    return KeyBindings(keys, labels);
+  }
+
+  /// [action] に [key] を割り当てる。ほかの操作が同じキーを使っていたら、入れ替える。
+  void bindKey(GameAction action, PhysicalKeyboardKey key, String label) {
+    final now = keys;
+    for (final other in GameAction.values) {
+      if (other != action && now[other] == key) {
+        _prefs.setString('key_${other.name}', '${now[action].usbHidUsage}|${now.label(action)}');
+      }
+    }
+    _set(() => _prefs.setString('key_${action.name}', '${key.usbHidUsage}|$label'));
+  }
+
+  void resetKeys() {
+    for (final a in GameAction.values) {
+      _prefs.remove('key_${a.name}');
+    }
+    notifyListeners();
+  }
+
+  /// 対戦結果の記録（新しい順、最大 [maxRecords] 件）
+  static const maxRecords = 200;
+  List<MatchRecord> get records => MatchRecord.decodeList(_prefs.getString('records'));
+
+  void addRecord(MatchRecord r) {
+    final list = [r, ...records].take(maxRecords).toList();
+    _set(() => _prefs.setString('records', MatchRecord.encodeList(list)));
+  }
+
+  void clearRecords() => _set(() => _prefs.remove('records'));
 
   void _set(Future<bool> Function() write) {
     write();

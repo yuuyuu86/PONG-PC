@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'catalog.dart';
+import '../boxing/boxing.dart';
 import 'common.dart';
 
 /// 競技に依存しない試合進行: 開始前の操作説明 → プレー → 得点演出 → 終了。
@@ -94,9 +95,13 @@ class MatchState {
 }
 
 class MatchEngine {
-  MatchEngine(this.game, {int? firstServer, math.Random? random})
+  /// [rule] は部屋で選んだルール（何点先取か、ボクシングは試合時間の秒数）
+  MatchEngine(this.game, {int? firstServer, math.Random? random, int? rule})
       : rules = game.rules,
+        winScore = game == GameKind.boxing ? game.rules.winScore : (rule ?? game.rules.winScore),
         state = MatchState(game: game, world: game.rules.makeWorld()) {
+    final w = state.world;
+    if (rule != null && w is BoxingWorld) w.clock = rule.toDouble();
     final server = rules.serveRule == ServeRule.none ? null : (firstServer ?? (random ?? math.Random()).nextInt(2));
     state.server = server;
     rules.serve(state.world, server);
@@ -108,6 +113,7 @@ class MatchEngine {
 
   final GameKind game;
   final SportRules rules;
+  final int? winScore;
   final MatchState state;
 
   void pause() {
@@ -161,7 +167,7 @@ class MatchEngine {
         if (side != null) s.score[side]++;
         s.lastPoint = LastPoint(side: side, reason: reason, landX: landX, n: (s.lastPoint?.n ?? 0) + 1);
         s.events.add(GameEvent('point', side: side));
-        final win = rules.winScore;
+        final win = winScore;
         if (side != null && win != null && s.score[side] >= win) {
           _finish(side, '$win点先取');
           return;

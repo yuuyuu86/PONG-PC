@@ -82,6 +82,17 @@ enum GameKind {
         boxing => const BoxingPainter(),
       };
 
+  /// 部屋を作るときに選べるルール。ボクシングは試合時間（秒）、ほかは何点先取か。
+  List<int> get ruleChoices => this == boxing ? const [30, 60, 90] : const [3, 5, 7, 11];
+
+  /// 何も選ばないときのルール（これまでと同じ）
+  int get defaultRule => this == boxing ? 60 : 5;
+
+  /// 選んだルールに合わせた説明
+  String ruleTextFor(int rule) => ruleText.replaceFirst(this == boxing ? '60秒' : '先に5点', this == boxing ? '$rule秒' : '先に$rule点');
+
+  String ruleLabel(int rule) => this == boxing ? '$rule秒' : '$rule点先取';
+
   /// 結果やスコアの単位（ボクシングは有効打の数）
   String? get scoreUnit => this == boxing ? '有効打' : null;
 }

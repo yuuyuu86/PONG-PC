@@ -13,6 +13,7 @@ import '../net/peer_identity.dart';
 import '../net/sessions.dart';
 import '../net/wire.dart';
 import 'feedback.dart';
+import 'records.dart';
 import 'keyboard.dart';
 import 'settings.dart';
 
@@ -137,7 +138,7 @@ class ConnectionProblem {
   final DateTime? since;
 }
 
-enum Screen { home, create, join, nearby, room, match, result, howto, settings, profile }
+enum Screen { home, create, join, nearby, records, room, match, result, howto, settings, profile }
 
 /// 画面の流れとセッションをまとめる。タイトル → 対戦準備 → 部屋（待機）→ 試合 → 結果。
 class AppModel extends ChangeNotifier implements SessionListener {
@@ -145,7 +146,7 @@ class AppModel extends ChangeNotifier implements SessionListener {
     keyboard = GameKeyboard((k) {
       host?.setKeys(k);
       guest?.setKeys(k);
-    });
+    }, bindings: () => settings.keys);
   }
 
   final AppSettings settings;
@@ -171,6 +172,9 @@ class AppModel extends ChangeNotifier implements SessionListener {
   SecureServerSocket? _server;
   PeerIdentity? _identity;
   int? _lastIntroCount;
+
+  /// この試合の結果をもう記録したか（試合が始まるたびに戻す）
+  bool _recorded = false;
 
   Profile get profile => Profile(settings.playerName, settings.avatar.encode());
   bool get inRoom => host != null || guest != null;
@@ -219,6 +223,7 @@ class AppModel extends ChangeNotifier implements SessionListener {
         if (screen != Screen.match) {
           feed.reset();
           _lastIntroCount = null;
+          _recorded = false;
           go(Screen.match);
         }
       case RoomPhase.result:
@@ -228,10 +233,10 @@ class AppModel extends ChangeNotifier implements SessionListener {
 
   // 部屋を作る・参加する ----------------------------------------------------
 
-  void createRoom(GameKind game) {
+  void createRoom(GameKind game, {int? rule}) {
     _leaveQuietly();
     joinMessage = null;
-    final h = HostSession(game: game, me: profile, listener: this)..onAdvertChange = _advertise;
+    final h = HostSession(game: game, me: profile, listener: this, rule: rule)..onAdvertChange = _advertise;
     host = h;
     inviteStatus = null;
     _advertise();
@@ -443,6 +448,23 @@ class AppModel extends ChangeNotifier implements SessionListener {
     }
   }
 
+  void _record(MatchState s) {
+    final r = room;
+    if (r == null) return;
+    _recorded = true;
+    final me = r.you;
+    settings.addRecord(MatchRecord(
+      at: DateTime.now(),
+      game: r.game,
+      rule: r.ruleValue,
+      opponent: r.opponent.name,
+      opponentAvatar: r.opponent.avatar,
+      myScore: s.score[me],
+      opponentScore: s.score[1 - me],
+      won: s.winner == null ? null : s.winner == me,
+    ));
+  }
+
   // SessionListener -------------------------------------------------------
 
   @override
@@ -465,6 +487,7 @@ class AppModel extends ChangeNotifier implements SessionListener {
 
   @override
   void sessionState(MatchState s) {
+    if (s.phase == MatchPhase.over && !_recorded) _record(s);
     feed.push(s, DateTime.now().millisecondsSinceEpoch / 1000);
     for (final e in s.events) {
       feedback.playEvent(e.type, side: e.side, you: you);

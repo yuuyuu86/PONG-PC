@@ -37,13 +37,74 @@ class CreateScreen extends StatelessWidget {
                   for (final (i, g) in GameKind.values.indexed)
                     SizedBox(
                       width: w,
-                      child: GameCard(game: g, seed: 20 + i, onTap: model.busy ? () {} : () => model.createRoom(g)),
+                      child: GameCard(game: g, seed: 20 + i, onTap: model.busy ? () {} : () => _pickRule(context, g)),
                     ),
                 ],
               );
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 競技を選んだあと、ルールを選んで部屋を作る
+Future<void> _pickRule(BuildContext context, GameKind game) async {
+  final model = Services.of(context).model;
+  final rule = await showDialog<int>(
+    context: context,
+    barrierColor: const Color(0x66000000),
+    builder: (ctx) => _RuleDialog(game: game),
+  );
+  if (rule != null) model.createRoom(game, rule: rule);
+}
+
+class _RuleDialog extends StatefulWidget {
+  const _RuleDialog({required this.game});
+  final GameKind game;
+
+  @override
+  State<_RuleDialog> createState() => _RuleDialogState();
+}
+
+class _RuleDialogState extends State<_RuleDialog> {
+  late int _rule = widget.game.defaultRule;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = widget.game;
+    final choices = g.ruleChoices;
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: DoodleBox(
+          shadow: true,
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DoodleHeading('PONG! ${g.title} のルール', size: 22),
+              const SizedBox(height: 14),
+              Text(g == GameKind.boxing ? '試合時間' : '何点で勝ち？', style: const TextStyle(fontSize: 18)),
+              const SizedBox(height: 8),
+              DoodleTabs(labels: [for (final c in choices) g.ruleLabel(c)], selected: choices.indexOf(_rule), seed: 210, onChanged: (i) => setState(() => _rule = choices[i])),
+              const SizedBox(height: 12),
+              Text(g.ruleTextFor(_rule), style: const TextStyle(fontSize: 16, color: Palette.pencil, height: 1.4)),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(child: DoodleButton(label: 'やめる', fontSize: 19, seed: 211, onPressed: () => Navigator.pop(context))),
+                  const SizedBox(width: 14),
+                  Expanded(child: DoodleButton(label: '部屋を作る', icon: Icons.add_home_rounded, fontSize: 19, primary: true, seed: 212, onPressed: () => Navigator.pop(context, _rule))),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

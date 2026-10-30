@@ -147,7 +147,7 @@ class _MatchHud extends StatelessWidget {
                 child: Column(
                   children: h.extra != null
                       ? [Text(h.extra!.center, style: const TextStyle(fontSize: 36, height: 1.1)), const Text('有効打の数', style: TextStyle(fontSize: 14))]
-                      : [Text('PONG! ${game.title}', style: const TextStyle(fontSize: 18)), Text('${game.rules.winScore ?? 5}点先取', style: const TextStyle(fontSize: 14, color: Palette.pencil))],
+                      : [Text('PONG! ${game.title}', style: const TextStyle(fontSize: 18)), Text(game.ruleLabel(model.room?.ruleValue ?? game.defaultRule), style: const TextStyle(fontSize: 14, color: Palette.pencil))],
                 ),
               ),
               _ScoreBox(side: 1, you: model.you, score: h.score[1], serving: serveShown && h.server == 1, bar: h.extra?.bars[1], avatar: _avatarOf(model, 1)),
@@ -353,7 +353,7 @@ class _Overlays extends StatelessWidget {
         Text('PONG! ${game.title}', style: const TextStyle(fontSize: 30)),
         const SizedBox(height: 6),
         Text('あなたは${model.you == 0 ? '左' : '右'}の選手（太い線・「あなた」）', style: const TextStyle(fontSize: 17)),
-        Text(game.ruleText, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, color: Palette.pencil)),
+        Text(game.ruleTextFor(model.room?.ruleValue ?? game.defaultRule), textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, color: Palette.pencil)),
         const SizedBox(height: 8),
         Row(
           mainAxisSize: MainAxisSize.min,

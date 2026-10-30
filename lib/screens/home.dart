@@ -121,6 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 18),
         for (final (i, (label, icon, screen)) in const [
           ('あそびかた', Icons.menu_book_rounded, Screen.howto),
+          ('せいせき', Icons.emoji_events_outlined, Screen.records),
           ('プロフィール', Icons.person_outline_rounded, Screen.profile),
           ('設定', Icons.tune_rounded, Screen.settings),
         ].indexed)
@@ -437,7 +438,7 @@ class GameCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      for (final c in game.controls.take(3)) Padding(padding: const EdgeInsets.only(right: 8), child: Keycap(c.key, size: 13)),
+                      for (final c in game.controls.take(3)) Padding(padding: const EdgeInsets.only(right: 8), child: Keycap(Services.of(context).settings.keys.describe(c.key), size: 13)),
                       const Spacer(),
                       const Text('えらぶ →', style: TextStyle(fontSize: 19)),
                     ],

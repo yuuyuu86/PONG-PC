@@ -15,6 +15,7 @@ import 'home.dart';
 import 'info.dart';
 import 'match.dart';
 import 'profile.dart';
+import 'records.dart';
 import 'room.dart';
 import 'setup.dart';
 
@@ -70,6 +71,7 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
           Screen.match => MatchScreen(),
           Screen.result => ResultScreen(),
           Screen.howto => HowToScreen(),
+          Screen.records => RecordsScreen(),
           Screen.settings => SettingsScreen(),
           Screen.profile => ProfileScreen(),
         };
@@ -104,7 +106,7 @@ class ControlsList extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Keycap(c.key, size: size - 2),
+                Keycap(Services.of(context).settings.keys.describe(c.key), size: size - 2),
                 const SizedBox(width: 10),
                 Flexible(child: Text(c.label, style: TextStyle(fontSize: size))),
               ],

@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pong_pc/app/app_model.dart';
+import 'package:pong_pc/app/records.dart';
 import 'package:pong_pc/app/feedback.dart';
 import 'package:pong_pc/app/settings.dart';
 import 'package:pong_pc/games/core/catalog.dart';
@@ -103,6 +104,11 @@ void main() {
     await shot('21-settings');
     model.go(Screen.profile);
     await shot('22-profile');
+    for (final (i, won) in [true, false, true].indexed) {
+      settings.addRecord(MatchRecord(at: DateTime(2026, 10, 30, 12, i), game: GameKind.values[i], rule: GameKind.values[i].defaultRule, opponent: 'はなこ', opponentAvatar: '2.1.4.0', myScore: won ? 5 : 2, opponentScore: won ? 3 : 5, won: won));
+    }
+    model.go(Screen.records);
+    await shot('23-records');
     model.keyboard.dispose();
   }, skip: dir == null);
 }
