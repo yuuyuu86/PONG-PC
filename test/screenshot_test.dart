@@ -32,7 +32,7 @@ void main() {
       final icons = '$root/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf';
       if (File(icons).existsSync()) await _loadFont('MaterialIcons', icons);
     });
-    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'avatar': '1.0.2.0', 'registered': true});
+    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'avatar': '1.0.2.0', 'registered': true, 'splashSeen': true});
     final settings = await AppSettings.load();
     final model = AppModel(settings: settings, feedback: GameFeedback(settings));
     tester.view.physicalSize = const Size(1200, 800);
