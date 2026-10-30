@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'doodle.dart';
 
-/// PONG! ロゴ。「！」の点はボールで、そこへ飛んできた軌跡の点線を描く。
+/// PONG! ロゴ。「！」の点はボール。
 /// [flight] を 0→1 に進めると、ボールが [entry]（点からの相対位置）から飛んできて点に着地する。
 class PongLogo extends StatelessWidget {
   const PongLogo({super.key, this.fontSize = 72, this.flight = 1, this.entry});
@@ -68,14 +68,6 @@ class _LogoPainter extends CustomPainter {
 
     final f = flight.clamp(0.0, 1.0);
     final ft = math.min(1.0, f / _air);
-    // 静止時は着地前の一部だけ、飛行中はボールのすぐ後ろだけ点線を残す
-    final trailFrom = f >= 1 ? 0.55 : math.max(0.0, ft - 0.3);
-    final trailTo = f >= 1 ? 0.93 : ft;
-    final pen = Sketch.pen(1.6 * k, color: Palette.pencil);
-    for (double t = trailFrom; t < trailTo; t += 0.012) {
-      if (((t * 1000).round() ~/ 12).isEven) canvas.drawLine(at(t), at(math.min(trailTo, t + 0.007)), pen);
-    }
-
     var ball = at(ft);
     if (f > _air && f < 1) {
       // 着地後に2回小さく弾む
