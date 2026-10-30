@@ -120,13 +120,16 @@ class Sketch {
 
 /// 紙の背景。細かいシミと薄い罫線で紙の質感を出す。
 class PaperBackground extends StatelessWidget {
-  const PaperBackground({super.key, required this.child});
+  const PaperBackground({super.key, required this.child, this.vignette = true});
   final Widget child;
+
+  /// 周りを少し暗くする（2台を並べる試合画面では付けない）
+  final bool vignette;
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: const _PaperPainter(),
+      painter: _PaperPainter(vignette: vignette),
       isComplex: true,
       willChange: false,
       child: child,
@@ -135,7 +138,8 @@ class PaperBackground extends StatelessWidget {
 }
 
 class _PaperPainter extends CustomPainter {
-  const _PaperPainter();
+  const _PaperPainter({this.vignette = true});
+  final bool vignette;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -147,17 +151,18 @@ class _PaperPainter extends CustomPainter {
       final p = Offset(rnd.nextDouble() * size.width, rnd.nextDouble() * size.height);
       canvas.drawCircle(p, rnd.nextDouble() * 0.9 + 0.2, speck);
     }
-    final vignette = Paint()
+    if (!vignette) return;
+    final shade = Paint()
       ..shader = ui.Gradient.radial(
         size.center(Offset.zero),
         size.longestSide * 0.75,
         [const Color(0x00000000), const Color(0x16000000)],
       );
-    canvas.drawRect(Offset.zero & size, vignette);
+    canvas.drawRect(Offset.zero & size, shade);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _PaperPainter old) => old.vignette != vignette;
 }
 
 /// 手描きの枠。ボタンやカードに使う。

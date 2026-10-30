@@ -11,12 +11,15 @@ import '../games/core/catalog.dart';
 import '../games/core/common.dart';
 import '../games/core/match.dart';
 import '../games/core/painting.dart';
+import '../games/rally/rally.dart';
 import '../ui/doodle.dart';
 import '../ui/logo.dart';
 import '../ui/widgets.dart';
 import 'root.dart';
 
-/// 試合画面: 上にスコア、真ん中にコート全体（両方のPCで同じ向き）、下に操作の案内。
+/// 試合画面: 上にスコア、真ん中にコート、下に操作の案内。
+/// バレーとバドミントンは、2台を横に並べるとコートがつながるよう、左の選手のPCにはネットまでの左半分、
+/// 右の選手のPCにはネットから右半分を映す（ネットが2台の境目に来る）。設定でコート全体にも切りかえられる。
 class MatchScreen extends StatelessWidget {
   const MatchScreen({super.key});
 
@@ -24,12 +27,24 @@ class MatchScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final model = Services.of(context).model;
     final game = model.room?.game ?? GameKind.volley;
+    final settings = Services.of(context).settings;
+    final split = game.splitCourt && !settings.fullCourt;
+    final you = model.you;
+    final court = Stack(
+      children: [
+        Positioned.fill(child: CourtView(feed: model.feed, you: you, split: split)),
+        Positioned.fill(child: _Overlays(game: game)),
+      ],
+    );
     return Scaffold(
       backgroundColor: Palette.paper,
+      // 半分表示では、紙の周りの陰を付けない（2台の境目が暗く見えてしまうため）
       body: PaperBackground(
+        vignette: !split,
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            // 半分表示では、ネット側（2台の境目）に余白を作らない
+            padding: EdgeInsets.fromLTRB(split && you == 1 ? 0 : 16, 10, split && you == 0 ? 0 : 16, 12),
             child: ListenableBuilder(
               listenable: model.feed,
               builder: (context, _) => Column(
@@ -37,23 +52,17 @@ class MatchScreen extends StatelessWidget {
                   _MatchHud(game: game),
                   const SizedBox(height: 8),
                   Expanded(
-                    child: Center(
-                      child: AspectRatio(
-                        aspectRatio: 16 / 9,
-                        child: CustomPaint(
-                          painter: SketchBorderPainter(seed: 110, strokeWidth: 3),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(6, 6, 10, 10),
-                            child: Stack(
-                              children: [
-                                Positioned.fill(child: CourtView(feed: model.feed, you: model.you)),
-                                Positioned.fill(child: _Overlays(game: game)),
-                              ],
+                    child: split
+                        ? court
+                        : Center(
+                            child: AspectRatio(
+                              aspectRatio: 16 / 9,
+                              child: CustomPaint(
+                                painter: SketchBorderPainter(seed: 110, strokeWidth: 3),
+                                child: Padding(padding: const EdgeInsets.fromLTRB(6, 6, 10, 10), child: court),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                    ),
                   ),
                   const SizedBox(height: 8),
                   _ControlStrip(game: game),
@@ -69,33 +78,52 @@ class MatchScreen extends StatelessWidget {
 
 /// コート。60fps でホストから届いた最新の状態を描く。
 class CourtView extends StatelessWidget {
-  const CourtView({super.key, required this.feed, required this.you});
+  const CourtView({super.key, required this.feed, required this.you, this.split = false});
 
   final MatchFeed feed;
   final int you;
+
+  /// 自分の側の半分だけを映す
+  final bool split;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       label: '試合のコート',
-      child: ClipRect(child: FrameClock(builder: (context, time) => CustomPaint(size: Size.infinite, painter: _CourtPainter(feed, you, time)))),
+      child: ClipRect(child: FrameClock(builder: (context, time) => CustomPaint(size: Size.infinite, painter: _CourtPainter(feed, you, time, split: split)))),
     );
   }
 }
 
 class _CourtPainter extends CustomPainter {
-  _CourtPainter(this.feed, this.you, this.time) : super(repaint: time);
+  _CourtPainter(this.feed, this.you, this.time, {this.split = false}) : super(repaint: time);
 
   final MatchFeed feed;
   final int you;
   final ValueNotifier<double> time;
+  final bool split;
 
   @override
   void paint(Canvas canvas, Size size) {
     final s = feed.latest;
     if (s == null) return;
-    final k = size.width / Field.width;
-    canvas.scale(k);
+    final double k;
+    if (split) {
+      // 半分（幅 480）を、高さが収まる範囲でできるだけ大きく映す。ネットは画面の境目側の端、
+      // 地面は画面の下から同じ距離に置くので、2台の画面の大きさが近ければ地面の高さと縮尺がそろう。
+      k = math.min(size.width / Field.center, size.height / Field.height);
+      final tx = you == 0 ? size.width - Field.center * k : -Field.center * k;
+      canvas
+        ..translate(tx, size.height - Field.height * k)
+        ..scale(k);
+      final x0 = you == 0 ? 0.0 : Field.center;
+      // 外側（ネットと反対）は画面の端まで描く。上はコートの高さで切る
+      // （画面より上に出たボールは、全体表示と同じく上端の矢印で示すため。空を見せると矢印と食い違う）
+      canvas.clipRect(Rect.fromLTRB(you == 0 ? -tx / k : x0, 0, you == 0 ? Field.center : Field.width + size.width / k, Field.height));
+    } else {
+      k = size.width / Field.width;
+      canvas.scale(k);
+    }
     final painter = s.game.painter;
     painter.paintCourt(canvas);
     final now = time.value;
@@ -110,6 +138,27 @@ class _CourtPainter extends CustomPainter {
     for (final b in feed.bursts) {
       b.draw(canvas, now);
     }
+    if (split) _offscreenHint(canvas, size, s, k);
+  }
+
+  /// 半分表示で、ボール・シャトルが相手の画面にあるとき、境目に小さな矢印を出す（手描き）
+  void _offscreenHint(Canvas canvas, Size size, MatchState s, double k) {
+    final w = s.world;
+    if (w is! RallyWorld || s.phase != MatchPhase.play) return;
+    final b = w.ball;
+    // 少しでも自分の画面に入っていれば、矢印は出さない
+    final onTheirSide = you == 0 ? b.x - b.r > Field.center : b.x + b.r < Field.center;
+    if (!onTheirSide) return;
+    final dir = you == 0 ? 1.0 : -1.0;
+    final edge = Field.center - dir * 18;
+    // 見えている高さの範囲に収める（上に飛んだときは上の端に）
+    final y = clampD(b.y, 30, Field.ground - 30);
+    final tip = Offset(edge + dir * 10, y);
+    final pen = Sketch.pen(2.6, color: Palette.pencil);
+    canvas
+      ..drawPath(Sketch.line(tip, tip + Offset(-dir * 16, -11), seed: 31), pen)
+      ..drawPath(Sketch.line(tip, tip + Offset(-dir * 16, 11), seed: 32), pen)
+      ..drawPath(Sketch.line(tip + Offset(-dir * 4, 0), tip + Offset(-dir * 26, 0), seed: 33), pen);
   }
 
   @override

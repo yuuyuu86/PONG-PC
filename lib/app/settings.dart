@@ -64,6 +64,11 @@ class AppSettings extends ChangeNotifier {
     return '${_nameIdeas[r.nextInt(_nameIdeas.length)]}${r.nextInt(90) + 10}';
   }
 
+  /// 試合でコート全体を映す（1台で確かめるときや、2台を並べられないとき）。
+  /// 既定は false で、バレーとバドミントンは2台に半分ずつ映す。
+  bool get fullCourt => _prefs.getBool('fullCourt') ?? false;
+  set fullCourt(bool v) => _set(() => _prefs.setBool('fullCourt', v));
+
   bool get soundOn => _prefs.getBool('soundOn') ?? true;
   set soundOn(bool v) => _set(() => _prefs.setBool('soundOn', v));
 

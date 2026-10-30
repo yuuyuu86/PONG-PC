@@ -340,7 +340,7 @@ class SideBySideHint extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text('$text 2台の画面がつながって、ひとつのコートになります。紙飛行機もとなりの画面へ飛んでいきます。', style: const TextStyle(fontSize: 16, height: 1.45)),
+          Text('$text バレーとバドミントンは2台の画面がつながって、ひとつのコートになります（ネットが境目）。紙飛行機もとなりの画面へ飛んでいきます。', style: const TextStyle(fontSize: 16, height: 1.45)),
         ],
       ),
     );

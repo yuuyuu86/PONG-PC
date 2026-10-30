@@ -41,6 +41,7 @@ void main() {
     final key = GlobalKey();
     await tester.pumpWidget(RepaintBoundary(key: key, child: PongApp(settings: settings, feedback: model.feedback, model: model, splash: false)));
 
+    ui.Image? last;
     Future<void> shot(String name) async {
       // 画面の切り替え（クロスフェード）が終わるまで進める
       await tester.pump();
@@ -49,6 +50,7 @@ void main() {
       await tester.runAsync(() async {
         final boundary = key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
         final img = await boundary.toImage();
+        last = img;
         final png = await img.toByteData(format: ui.ImageByteFormat.png);
         File('$dir/$name.png').writeAsBytesSync(png!.buffer.asUint8List());
       });
@@ -75,16 +77,45 @@ void main() {
         info.players[0],
         const PlayerInfo(present: true, name: 'はなこ', avatar: '2.1.4.0', connected: true),
       ]);
-      model.sessionRoom(info);
       for (var t = 0; t < MatchEngine.introTime * 60 + 40; t++) {
         e.step([
           PlayerInput(right: t % 90 < 50, actPressed: t == 260, jump: game != GameKind.boxing && t == 255),
           PlayerInput(left: t % 70 < 30, actPressed: t == 275, jump: game == GameKind.boxing && t > 250),
         ], 1 / 60);
       }
-      model.sessionState(e.state);
-      await shot('1$i-match-${game.name}');
+      // 左の選手のPCと右の選手のPCを書き出し、横に並べた1枚も作る（コートがつながるかを見る）
+      final halves = <ui.Image>[];
+      for (final you in [0, 1]) {
+        info = RoomInfo(code: 'KQTE', game: game, phase: RoomPhase.match, you: you, players: [
+          // 左右どちらの画面でも、左の選手はゆうた、右の選手ははなこ（同じ試合を2台から見る）
+          const PlayerInfo(present: true, name: 'ゆうた', avatar: '1.0.2.0', connected: true),
+          const PlayerInfo(present: true, name: 'はなこ', avatar: '2.1.4.0', connected: true),
+        ]);
+        model.sessionRoom(info);
+        model.sessionState(e.state);
+        await shot('1$i-match-${game.name}-${you == 0 ? 'left' : 'right'}');
+        halves.add(last!);
+      }
+      await tester.runAsync(() async {
+        final rec = ui.PictureRecorder();
+        Canvas(rec)
+          ..drawImage(halves[0], Offset.zero, Paint())
+          ..drawImage(halves[1], Offset(halves[0].width.toDouble(), 0), Paint());
+        final pair = await rec.endRecording().toImage(halves[0].width * 2, halves[0].height);
+        final png = await pair.toByteData(format: ui.ImageByteFormat.png);
+        File('$dir/1$i-match-${game.name}-pair.png').writeAsBytesSync(png!.buffer.asUint8List());
+      });
+      if (game == GameKind.volley) {
+        settings.fullCourt = true;
+        await shot('1$i-match-${game.name}-full');
+        settings.fullCourt = false;
+      }
     }
+    info = RoomInfo(code: 'KQTE', game: GameKind.volley, phase: RoomPhase.match, you: 0, players: [
+      const PlayerInfo(present: true, name: 'ゆうた', avatar: '1.0.2.0', connected: true),
+      const PlayerInfo(present: true, name: 'はなこ', avatar: '2.1.4.0', connected: true),
+    ]);
+    model.sessionRoom(info);
     final intro = MatchEngine(GameKind.fencing)..step(const [PlayerInput.none, PlayerInput.none], 1 / 60);
     model.sessionState(intro.state);
     await shot('19-intro');

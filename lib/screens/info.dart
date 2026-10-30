@@ -53,7 +53,7 @@ class _HowToScreenState extends State<HowToScreen> {
             for (final (i, s) in _steps.indexed)
               Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('${i + 1}. $s', style: const TextStyle(fontSize: 17, height: 1.45))),
             const SizedBox(height: 6),
-            const Text('どちらの画面にもコート全体が同じ向きで見えます。自分の選手は太い線と、墨で塗った「あなた」の名札、相手は点線の名札「あいて」で見分けられます。',
+            const Text('バレーとバドミントンは、2台を横に並べるとコートがつながります。左の選手のPCにはネットまでの左半分、右の選手のPCにはネットから右半分が映ります（1台で遊ぶときは設定で「コート全体」に）。フェンシングとボクシングは、どちらの画面にもコート全体が映ります。自分の選手は太い線と、墨で塗った「あなた」の名札、相手は点線の名札「あいて」で見分けられます。',
                 style: TextStyle(fontSize: 16, height: 1.45)),
             const SizedBox(height: 6),
             const Text('通信が切れたら試合は自動で止まり、つながり直すと同じところから続きます。', style: TextStyle(fontSize: 16, height: 1.45)),
@@ -137,6 +137,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: Slider(value: s.settings.volume, onChanged: (v) => s.settings.volume = v, onChangeEnd: (_) => s.feedback.play(Sound.hit)),
                       ),
                     ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 22),
+          DoodleBox(
+            seed: 86,
+            child: ListenableBuilder(
+              listenable: s.settings,
+              builder: (context, _) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const DoodleHeading('試合の表示', size: 21),
+                  const SizedBox(height: 6),
+                  const Text('バレーとバドミントンは、2台を横に並べるとコートがつながるよう、半分ずつ映します。1台で確かめるときや、2台を並べられないときは「コート全体」にしてください。フェンシングとボクシングは、いつもコート全体を映します。',
+                      style: TextStyle(fontSize: 15, color: Palette.pencil, height: 1.4)),
+                  const SizedBox(height: 10),
+                  DoodleTabs(
+                    labels: const ['2台で半分ずつ', 'コート全体'],
+                    selected: s.settings.fullCourt ? 1 : 0,
+                    seed: 87,
+                    onChanged: (i) => s.settings.fullCourt = i == 1,
                   ),
                 ],
               ),
