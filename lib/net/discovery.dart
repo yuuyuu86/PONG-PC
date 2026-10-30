@@ -103,7 +103,10 @@ class Discovery extends ChangeNotifier {
     );
   }
 
-  /// 送り先: 全体へのブロードキャストと、各ネットワークの x.y.z.255（多くの家庭・学校の Wi-Fi はこれで届く）
+  /// 送り先: 全体へのブロードキャストと、各ネットワークのブロードキャストアドレス。
+  /// ネットワークの大きさ（サブネットマスク）は Dart から分からないので、/24（家庭に多い x.y.z.255）から
+  /// /16 まで、ありうるものをすべて送り先にする。学校や会社の Wi-Fi は /23 や /22 のことが多く、
+  /// x.y.z.255 だけではブロードキャストにならない。
   Future<void> _refreshTargets() async {
     final targets = <String>{if (!loopbackOnly) '255.255.255.255', '127.0.0.1'};
     if (loopbackOnly) {
@@ -114,8 +117,13 @@ class Discovery extends ChangeNotifier {
       for (final ni in await NetworkInterface.list(type: InternetAddressType.IPv4)) {
         for (final a in ni.addresses) {
           if (a.isLoopback) continue;
-          final p = a.address.split('.');
-          if (p.length == 4) targets.add('${p[0]}.${p[1]}.${p[2]}.255');
+          final b = a.rawAddress;
+          if (b.length != 4) continue;
+          final ip = (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3];
+          for (var prefix = 24; prefix >= 16; prefix--) {
+            final cast = ip | ((1 << (32 - prefix)) - 1);
+            targets.add([cast >> 24, cast >> 16, cast >> 8, cast].map((x) => x & 0xff).join('.'));
+          }
         }
       }
     } catch (_) {}

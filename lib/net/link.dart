@@ -20,6 +20,8 @@ class Link {
       onDone: close,
       cancelOnError: true,
     );
+    // 送信側のエラー（相手が切った後の書き込みなど）は done に届く。受け取らないと未処理のエラーになる
+    _socket.done.then((_) {}, onError: (_) => close());
   }
 
   /// つなぐ。timeout 以内につながらなければ null。
