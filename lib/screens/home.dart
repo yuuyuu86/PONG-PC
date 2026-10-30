@@ -93,6 +93,8 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, _) => Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // 看板の地面とそろうよう、少し下げる
+          const SizedBox(height: 70),
           Flexible(
             child: AspectRatio(
               aspectRatio: 0.75,

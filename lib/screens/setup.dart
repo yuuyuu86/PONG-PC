@@ -83,6 +83,8 @@ class _JoinScreenState extends State<JoinScreen> {
           if (widget.nearby) ...[
             const Text('同じWi-Fiで相手を待っている部屋です。押すとその部屋に参加します。あなたが右の選手になります。', style: TextStyle(fontSize: 18, height: 1.45)),
             const SizedBox(height: 16),
+            const SideBySideHint(you: 1),
+            const SizedBox(height: 22),
             const NearbyRooms(showEmpty: true),
           ] else ...[
             const Text('相手の画面に出ている英字4文字を入れてください。あなたが右の選手になります。', style: TextStyle(fontSize: 18, height: 1.45)),
@@ -168,7 +170,7 @@ class NearbyRooms extends StatelessWidget {
                     DoodleSpinner(size: 20),
                     SizedBox(width: 10),
                     Expanded(
-                      child: StatusLine(state: StatusKind.waiting, text: '部屋を探しています…（相手に「部屋を作る」を押してもらってください）'),
+                      child: Text('部屋を探しています…（相手に「部屋を作る」を押してもらってください）', style: TextStyle(fontSize: 17)),
                     ),
                   ],
                 )

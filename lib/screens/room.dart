@@ -111,9 +111,9 @@ class _RoomScreenState extends State<RoomScreen> {
             final showInvite = r.you == 0 && !opp.present;
             if (!showInvite) return left;
             if (constraints.maxWidth < 800 || MediaQuery.textScalerOf(context).scale(1) > 1.3) {
-              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [left, const SizedBox(height: 24), const InvitePanel()]);
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [left, const SizedBox(height: 24), SideBySideHint(you: r.you), const SizedBox(height: 24), const InvitePanel()]);
             }
-            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: left), const SizedBox(width: 26), const Expanded(child: InvitePanel())]);
+            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: left), const SizedBox(width: 26), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [SideBySideHint(you: r.you), const SizedBox(height: 22), const InvitePanel()]))]);
           }),
         ],
       ),
@@ -174,21 +174,35 @@ class PlayersBox extends StatelessWidget {
     );
   }
 
+  /// 1人分: アバター、名前（あなた）、その下に役割と状態
   Widget _row(int side) {
     final p = room.players[side];
     final role = side == 0 ? 'P1 左（部屋を作った人）' : 'P2 右（参加した人）';
-    final me = side == room.you ? ' ← あなた' : '';
-    if (!p.present) return StatusLine(state: StatusKind.waiting, text: '$role: まだいません');
+    final status = !p.present
+        ? 'まだいません'
+        : !p.connected
+            ? '通信が切れています'
+            : p.ready
+                ? '準備完了'
+                : '待機中';
     return Row(
       children: [
-        AvatarView(avatar: p.look, size: 40, bust: true),
-        const SizedBox(width: 8),
+        SizedBox(
+          width: 48,
+          height: 48,
+          child: p.present ? AvatarView(avatar: p.look, size: 48, bust: true) : const Center(child: DoodleSpinner(size: 22)),
+        ),
+        const SizedBox(width: 12),
         Expanded(
-          child: StatusLine(
-            state: p.connected ? StatusKind.ok : StatusKind.bad,
-            text: '$role: ${p.name}$me（${!p.connected ? '通信が切れています' : p.ready ? '準備完了' : '待機中'}）',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(p.present ? p.name + (side == room.you ? '（あなた）' : '') : '相手を待っています', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 21, height: 1.2)),
+              Text(role, style: const TextStyle(fontSize: 15, color: Palette.pencil)),
+            ],
           ),
         ),
+        SizedBox(width: 170, child: StatusLine(state: !p.present ? StatusKind.waiting : !p.connected ? StatusKind.bad : StatusKind.ok, text: status)),
       ],
     );
   }
@@ -213,7 +227,7 @@ class InvitePanel extends StatelessWidget {
             children: [
               const Row(children: [Icon(Icons.send_rounded, color: Palette.ink), SizedBox(width: 8), DoodleHeading('紙飛行機で招待', size: 22)]),
               const SizedBox(height: 10),
-              const Text('相手のPCをこのPCの右どなりに置いてください。紙飛行機が画面の右から飛び出して、相手の画面に招待状を届けます。', style: TextStyle(fontSize: 16, height: 1.45)),
+              const Text('近くのPCを選ぶと、紙飛行機が画面の右から飛び出して、相手の画面に招待状を届けます。', style: TextStyle(fontSize: 16, height: 1.45)),
               const SizedBox(height: 12),
               if (peers.isEmpty)
                 const Row(children: [DoodleSpinner(size: 20), SizedBox(width: 10), Flexible(child: Text('同じWi-Fiで PONG! を開いているPCを探しています…', style: TextStyle(fontSize: 16)))])

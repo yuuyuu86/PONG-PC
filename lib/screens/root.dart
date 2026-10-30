@@ -299,3 +299,87 @@ void drawPlane(Canvas c, Offset at, double angle, {double scale = 1, double flat
   ink(c, Sketch.line(const Offset(32, -1), const Offset(-21, -9), seed: 11, wobble: 0.3), 1);
   c.restore();
 }
+
+/// 「2台を横に並べてね」の注意書き。左右の画面がつながってコートになるので、並べる向きをイラストで見せる。
+/// [you] は 0 なら左（部屋を作った人）、1 なら右（参加する人）。
+class SideBySideHint extends StatelessWidget {
+  const SideBySideHint({super.key, required this.you});
+  final int you;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = you == 0 ? '相手のPCを、このPCの右どなりに置いてください。' : 'このPCを、相手のPCの右どなりに置いてください。';
+    return DoodleBox(
+      seed: 140,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Row(children: [Icon(Icons.info_outline_rounded, color: Palette.ink), SizedBox(width: 8), DoodleHeading('2台を横にならべてね', size: 21)]),
+          const SizedBox(height: 10),
+          SizedBox(height: 150, child: CustomPaint(painter: _SideBySidePainter(you))),
+          const SizedBox(height: 8),
+          Text('$text 2台の画面がつながって、ひとつのコートになります。紙飛行機もとなりの画面へ飛んでいきます。', style: const TextStyle(fontSize: 16, height: 1.45)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SideBySidePainter extends CustomPainter {
+  _SideBySidePainter(this.you);
+  final int you;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final pen = Sketch.pen(2.4);
+    final thin = Sketch.pen(1.6);
+    final w = math.min(170.0, size.width * 0.38);
+    final h = w * 0.58;
+    final gap = 10.0;
+    final left = size.width / 2 - w - gap / 2;
+    final top = 8.0;
+    for (var i = 0; i < 2; i++) {
+      final x = left + i * (w + gap);
+      // 画面とキーボード
+      final screen = Rect.fromLTWH(x, top, w, h);
+      canvas.drawPath(Sketch.rect(screen, seed: 141 + i), Sketch.fill(i == you ? Palette.paperShade : Palette.paper));
+      Sketch.strokeTwice(canvas, (s) => Sketch.rect(screen, seed: s), pen, seed: 141 + i);
+      final base = Sketch.polygon([
+        Offset(x - 8, top + h + 18),
+        Offset(x + w + 8, top + h + 18),
+        Offset(x + w, top + h + 4),
+        Offset(x, top + h + 4),
+      ], seed: 150 + i);
+      canvas.drawPath(base, pen);
+      // ラベル
+      final tp = TextPainter(
+        text: TextSpan(text: i == you ? 'このPC' : '相手のPC', style: const TextStyle(fontFamily: kFontFamily, fontSize: 15, color: Palette.ink)),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(x + (w - tp.width) / 2, top + h + 22));
+      // 画面の中: 床と棒人間
+      final floor = top + h - 12;
+      canvas.drawPath(Sketch.line(Offset(x + 8, floor), Offset(x + w - 8, floor), seed: 160 + i), thin);
+      final px = i == 0 ? x + w * 0.3 : x + w * 0.7;
+      canvas.drawCircle(Offset(px, floor - 30), 6, thin);
+      canvas.drawPath(Sketch.line(Offset(px, floor - 24), Offset(px, floor - 10), seed: 170 + i), thin);
+      canvas.drawPath(Sketch.line(Offset(px, floor - 10), Offset(px - 6, floor), seed: 172 + i), thin);
+      canvas.drawPath(Sketch.line(Offset(px, floor - 10), Offset(px + 6, floor), seed: 174 + i), thin);
+    }
+    // 2台をまたいで飛ぶボール（点線の弧）
+    final a = Offset(left + w * 0.35, top + h - 40);
+    final b = Offset(left + w + gap + w * 0.65, top + h - 40);
+    final path = Path()
+      ..moveTo(a.dx, a.dy)
+      ..quadraticBezierTo((a.dx + b.dx) / 2, top - 6, b.dx, b.dy);
+    for (final m in path.computeMetrics()) {
+      for (var d = 0.0; d < m.length; d += 12) {
+        canvas.drawPath(m.extractPath(d, d + 6), thin);
+      }
+    }
+    canvas.drawCircle(Offset((a.dx + b.dx) / 2, (a.dy + top - 6) / 2), 5, Sketch.fill(Palette.ink));
+  }
+
+  @override
+  bool shouldRepaint(covariant _SideBySidePainter old) => old.you != you;
+}

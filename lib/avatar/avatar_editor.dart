@@ -27,7 +27,7 @@ class AvatarEditor extends StatelessWidget {
       Align(child: DoodleButton(label: 'おまかせ', icon: Icons.casino_outlined, fontSize: 17, seed: 182, onPressed: () => onChanged(Avatar.random()))),
     ]);
     if (horizontal) {
-      return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: preview), const SizedBox(width: 32), Expanded(child: options)]);
+      return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(flex: 2, child: preview), const SizedBox(width: 24), Expanded(flex: 3, child: options)]);
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [preview, const SizedBox(height: 14), options]);
   }
@@ -47,7 +47,7 @@ class _PartRow extends StatelessWidget {
       height: 56,
       child: Row(
         children: [
-          SizedBox(width: 112, child: Text(part.label, maxLines: 1, softWrap: false, overflow: TextOverflow.fade, style: const TextStyle(fontSize: 16, color: Palette.ink))),
+          SizedBox(width: 104, child: Text(part.label, maxLines: 1, softWrap: false, overflow: TextOverflow.fade, style: const TextStyle(fontSize: 16, color: Palette.ink))),
           _Arrow(
             icon: Icons.chevron_left_rounded,
             label: '${part.label}を前へ',
@@ -56,10 +56,14 @@ class _PartRow extends StatelessWidget {
           Expanded(
             child: Semantics(
               liveRegion: true,
-              child: Text(
-                value.optionLabel(part),
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 19, color: Palette.ink),
+              // 狭くても縦書きのように折り返さず、1行のまま小さくする
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  value.optionLabel(part),
+                  maxLines: 1,
+                  style: const TextStyle(fontSize: 19, color: Palette.ink),
+                ),
               ),
             ),
           ),

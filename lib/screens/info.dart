@@ -103,6 +103,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       title: '設定',
       onBack: () => s.model.go(Screen.home),
       child: PageBody(
+        maxWidth: 680,
         children: [
           DoodleBox(
             seed: 82,

@@ -345,19 +345,27 @@ Future<bool> confirmDialog(BuildContext context, {required String message, requi
     builder: (ctx) => Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      child: DoodleBox(
-        shadow: true,
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(message, style: const TextStyle(fontSize: 20, color: Palette.ink, height: 1.4)),
-            const SizedBox(height: 20),
-            DoodleButton(label: ok, primary: true, onPressed: () => Navigator.pop(ctx, true), seed: 5),
-            const SizedBox(height: 12),
-            DoodleButton(label: cancel, onPressed: () => Navigator.pop(ctx, false), seed: 6),
-          ],
+      // PC では画面いっぱいに広げず、ボタンは横に並べる（右が実行）
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: DoodleBox(
+          shadow: true,
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(message, style: const TextStyle(fontSize: 20, color: Palette.ink, height: 1.4)),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(child: DoodleButton(label: cancel, fontSize: 19, onPressed: () => Navigator.pop(ctx, false), seed: 6)),
+                  const SizedBox(width: 14),
+                  Expanded(child: DoodleButton(label: ok, fontSize: 19, primary: true, onPressed: () => Navigator.pop(ctx, true), seed: 5)),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     ),

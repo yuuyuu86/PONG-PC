@@ -58,6 +58,8 @@ void main() {
     await shot('02-create');
     model.go(Screen.join);
     await shot('02-join');
+    model.go(Screen.nearby);
+    await shot('02-nearby');
     model.go(Screen.howto);
     await shot('04-howto');
     var info = const RoomInfo(code: 'KQTE', game: GameKind.volley, phase: RoomPhase.lobby, you: 0, players: [
@@ -99,6 +101,8 @@ void main() {
     await shot('20-result');
     model.go(Screen.settings);
     await shot('21-settings');
+    model.go(Screen.profile);
+    await shot('22-profile');
     model.keyboard.dispose();
   }, skip: dir == null);
 }
