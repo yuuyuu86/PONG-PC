@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../app/app_model.dart';
+import '../app/feedback.dart';
 import '../app/services.dart';
 import '../games/core/catalog.dart';
 import '../games/core/painting.dart';
@@ -52,6 +53,9 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
       builder: (context, _) {
         // const にしない: 部屋や試合の状態が変わるたびに画面を作り直す
         final settings = Services.of(context).settings;
+        if (!settings.splashSeen) {
+          return SplashScreen(onLand: () => Services.of(context).feedback.play(Sound.bounce), onDone: settings.markSplashSeen);
+        }
         final screen = !settings.registered ? RegisterScreen() : switch (model.screen) {
           Screen.home => HomeScreen(),
           Screen.create => CreateScreen(),

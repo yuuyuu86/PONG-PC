@@ -11,7 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets('共通ボタンをキーボードで実行できる', (tester) async {
-    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'registered': true, 'soundOn': false});
+    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'registered': true, 'splashSeen': true, 'soundOn': false});
     final settings = await AppSettings.load();
     final model = AppModel(settings: settings, feedback: GameFeedback(settings));
     tester.view.physicalSize = const Size(1200, 800);
@@ -27,7 +27,7 @@ void main() {
   });
 
   testWidgets('部屋の画面は、相手が参加すると表示が変わる', (tester) async {
-    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'avatar': '0.0.1.0', 'registered': true});
+    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'avatar': '0.0.1.0', 'registered': true, 'splashSeen': true});
     final settings = await AppSettings.load();
     final model = AppModel(settings: settings, feedback: GameFeedback(settings));
     tester.view.physicalSize = const Size(1200, 800);
@@ -53,7 +53,7 @@ void main() {
   });
 
   testWidgets('ホームの札から部屋づくり・参加へ進み、あそびかたはタブで切り替える', (tester) async {
-    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'registered': true, 'soundOn': false});
+    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'registered': true, 'splashSeen': true, 'soundOn': false});
     final settings = await AppSettings.load();
     final model = AppModel(settings: settings, feedback: GameFeedback(settings));
     tester.view.physicalSize = const Size(1200, 800);
