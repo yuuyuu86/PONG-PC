@@ -20,13 +20,18 @@ import 'setup.dart';
 
 /// 画面の切り替えと、どの画面にも重ねるもの（接続の問題・招待状・紙飛行機）
 class RootScreen extends StatefulWidget {
-  const RootScreen({super.key});
+  const RootScreen({super.key, this.splash = true});
+
+  /// 起動時にロゴのスプラッシュを流すか
+  final bool splash;
 
   @override
   State<RootScreen> createState() => _RootScreenState();
 }
 
 class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
+  late var _splash = widget.splash;
+
   @override
   void initState() {
     super.initState();
@@ -53,8 +58,8 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
       builder: (context, _) {
         // const にしない: 部屋や試合の状態が変わるたびに画面を作り直す
         final settings = Services.of(context).settings;
-        if (!settings.splashSeen) {
-          return SplashScreen(onLand: () => Services.of(context).feedback.play(Sound.bounce), onDone: settings.markSplashSeen);
+        if (_splash) {
+          return SplashScreen(onLand: () => Services.of(context).feedback.play(Sound.bounce), onDone: () => setState(() => _splash = false));
         }
         final screen = !settings.registered ? RegisterScreen() : switch (model.screen) {
           Screen.home => HomeScreen(),

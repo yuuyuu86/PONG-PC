@@ -134,7 +134,7 @@ class AppIconPainter extends CustomPainter {
   bool shouldRepaint(covariant AppIconPainter old) => false;
 }
 
-/// 初回起動時のスプラッシュ。ボールが画面の外から飛んできてロゴの「！」の点に着地する。
+/// 起動時のスプラッシュ。ボールが画面の外から飛んできてロゴの「！」の点に着地する。
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key, required this.onDone, this.onLand});
 

@@ -61,10 +61,6 @@ class AppSettings extends ChangeNotifier {
     return '${_nameIdeas[r.nextInt(_nameIdeas.length)]}${r.nextInt(90) + 10}';
   }
 
-  /// 初回起動のスプラッシュ（ロゴの動き）を見たか
-  bool get splashSeen => _prefs.getBool('splashSeen') ?? false;
-  void markSplashSeen() => _set(() => _prefs.setBool('splashSeen', true));
-
   bool get soundOn => _prefs.getBool('soundOn') ?? true;
   set soundOn(bool v) => _set(() => _prefs.setBool('soundOn', v));
 
