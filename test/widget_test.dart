@@ -52,7 +52,7 @@ void main() {
     model.keyboard.dispose();
   });
 
-  testWidgets('対戦準備とあそびかたはタブで切り替える', (tester) async {
+  testWidgets('ホームの札から部屋づくり・参加へ進み、あそびかたはタブで切り替える', (tester) async {
     SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'registered': true, 'soundOn': false});
     final settings = await AppSettings.load();
     final model = AppModel(settings: settings, feedback: GameFeedback(settings));
@@ -62,14 +62,16 @@ void main() {
     addTearDown(model.keyboard.dispose);
     await tester.pumpWidget(PongApp(settings: settings, feedback: model.feedback, model: model));
 
-    // 対戦準備: 最初は「部屋を作る」、タブを押すとコード入力に変わる
-    model.go(Screen.setup, game: GameKind.volley);
+    // ホーム: 左の札から「部屋を作る」は競技えらび、「コードで参加」はコード入力へ
+    await tester.tap(find.text('部屋を作る'));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('コードを相手に伝える'), findsOneWidget);
-    expect(find.widgetWithText(TextField, 'ABCD'), findsNothing);
+    expect(model.screen, Screen.create);
+    expect(find.text('バレー'), findsOneWidget);
+    model.go(Screen.home);
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('コードで参加'));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('コードを相手に伝える'), findsNothing);
+    expect(model.screen, Screen.join);
     expect(find.byType(TextField), findsOneWidget);
 
     // あそびかた: 「はじめかた」と競技ごとのタブ

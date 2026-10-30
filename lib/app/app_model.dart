@@ -137,7 +137,7 @@ class ConnectionProblem {
   final DateTime? since;
 }
 
-enum Screen { home, setup, room, match, result, howto, settings, profile }
+enum Screen { home, create, join, room, match, result, howto, settings, profile }
 
 /// 画面の流れとセッションをまとめる。タイトル → 対戦準備 → 部屋（待機）→ 試合 → 結果。
 class AppModel extends ChangeNotifier implements SessionListener {

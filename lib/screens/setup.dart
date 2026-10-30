@@ -8,20 +8,53 @@ import '../net/discovery.dart';
 import '../net/wire.dart';
 import '../ui/doodle.dart';
 import '../ui/widgets.dart';
+import 'home.dart';
 import 'root.dart';
 
-/// 選んだゲームの対戦準備: 部屋を作る / コードで参加 / 近くの部屋
-class SetupScreen extends StatefulWidget {
-  const SetupScreen({super.key, required this.game});
-  final GameKind game;
+/// 部屋を作る: 競技を選ぶと、その競技の部屋ができる
+class CreateScreen extends StatelessWidget {
+  const CreateScreen({super.key});
 
   @override
-  State<SetupScreen> createState() => _SetupScreenState();
+  Widget build(BuildContext context) {
+    final model = Services.of(context).model;
+    return DoodleScaffold(
+      title: '部屋を作る',
+      onBack: () => model.go(Screen.home),
+      child: PageBody(
+        maxWidth: 980,
+        children: [
+          const Text('あそぶ競技をえらんでください。部屋ができたら、4文字のコードを相手に伝えるか、紙飛行機で招待します。あなたが左の選手になります。',
+              style: TextStyle(fontSize: 18, height: 1.45)),
+          const SizedBox(height: 20),
+          LayoutBuilder(builder: (context, c) {
+            final two = c.maxWidth > 700;
+            final w = two ? (c.maxWidth - 22) / 2 : c.maxWidth;
+            return Wrap(
+              spacing: 22,
+              runSpacing: 22,
+              children: [
+                for (final (i, g) in GameKind.values.indexed)
+                  SizedBox(width: w, child: GameCard(game: g, seed: 20 + i, onTap: model.busy ? () {} : () => model.createRoom(g))),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
 }
 
-class _SetupScreenState extends State<SetupScreen> {
+/// コードで参加 / 近くの部屋に参加
+class JoinScreen extends StatefulWidget {
+  const JoinScreen({super.key});
+
+  @override
+  State<JoinScreen> createState() => _JoinScreenState();
+}
+
+class _JoinScreenState extends State<JoinScreen> {
   final _code = TextEditingController();
-  int _tab = 0;
 
   @override
   void dispose() {
@@ -32,48 +65,17 @@ class _SetupScreenState extends State<SetupScreen> {
   @override
   Widget build(BuildContext context) {
     final model = Services.of(context).model;
-    final g = widget.game;
     final msg = model.joinMessage;
-    final info = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('${g.summary}\n${g.ruleText}', style: const TextStyle(fontSize: 18, height: 1.5)),
-        const SizedBox(height: 16),
-        DoodleBox(
-          seed: 60,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [const DoodleHeading('そうさ（2台とも同じキー）', size: 19), const SizedBox(height: 8), ControlsList(controls: g.controls)],
-          ),
-        ),
-      ],
-    );
-    // 参加のしかたはタブで切り替える（スマホ版と同じ）
-    final connect = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        DoodleTabs(labels: const ['部屋を作る', 'コードで参加'], selected: _tab, seed: 44, onChanged: (i) => setState(() => _tab = i)),
-        const SizedBox(height: 20),
-        if (_tab == 0) ...[
-          const Text('部屋を作ると 4文字のコードが出ます。そのコードを相手に伝えるか、紙飛行機で招待してください。あなたが左の選手になります。',
-              style: TextStyle(fontSize: 17, height: 1.45)),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: SizedBox(
-              width: 280,
-              child: DoodleButton(
-                label: '部屋を作る',
-                subtitle: 'コードを相手に伝える',
-                icon: Icons.add_home_rounded,
-                primary: true,
-                seed: 41,
-                onPressed: model.busy ? null : () => model.createRoom(g),
-              ),
-            ),
-          ),
-        ] else ...[
-          const Text('相手の画面に出ている英字4文字を入れてください。あなたが右の選手になります。', style: TextStyle(fontSize: 17, height: 1.45)),
+    return DoodleScaffold(
+      title: 'コードで参加',
+      onBack: () {
+        model.joinMessage = null;
+        model.go(Screen.home);
+      },
+      child: PageBody(
+        maxWidth: 760,
+        children: [
+          const Text('相手の画面に出ている英字4文字を入れてください。あなたが右の選手になります。', style: TextStyle(fontSize: 18, height: 1.45)),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -97,39 +99,21 @@ class _SetupScreenState extends State<SetupScreen> {
               SizedBox(width: 130, child: DoodleButton(label: '参加', icon: Icons.login_rounded, seed: 42, onPressed: model.busy ? null : () => model.join(_code.text))),
             ],
           ),
-          const SizedBox(height: 22),
-          const NearbyRooms(),
-        ],
-        if (msg != null) ...[
-          const SizedBox(height: 18),
-          DoodleBox(
-            seed: 63,
-            dashed: !msg.error,
-            child: Row(
-              children: [
-                if (!msg.error) ...[const DoodleSpinner(size: 20), const SizedBox(width: 10)],
-                Expanded(child: StatusLine(state: msg.error ? StatusKind.bad : StatusKind.waiting, text: msg.text)),
-              ],
+          if (msg != null) ...[
+            const SizedBox(height: 18),
+            DoodleBox(
+              seed: 63,
+              dashed: !msg.error,
+              child: Row(
+                children: [
+                  if (!msg.error) ...[const DoodleSpinner(size: 20), const SizedBox(width: 10)],
+                  Expanded(child: StatusLine(state: msg.error ? StatusKind.bad : StatusKind.waiting, text: msg.text)),
+                ],
+              ),
             ),
-          ),
-        ],
-      ],
-    );
-    return DoodleScaffold(
-      title: 'PONG! ${g.title}',
-      onBack: () {
-        model.joinMessage = null;
-        model.go(Screen.home);
-      },
-      child: PageBody(
-        children: [
-          // 狭いウィンドウや大きな文字では縦に並べる
-          LayoutBuilder(builder: (context, constraints) {
-            if (constraints.maxWidth < 760 || MediaQuery.textScalerOf(context).scale(1) > 1.3) {
-              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [connect, const SizedBox(height: 22), info]);
-            }
-            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: info), const SizedBox(width: 32), Expanded(child: connect)]);
-          }),
+          ],
+          const SizedBox(height: 26),
+          const NearbyRooms(),
         ],
       ),
     );

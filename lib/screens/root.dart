@@ -54,7 +54,8 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
         final settings = Services.of(context).settings;
         final screen = !settings.registered ? RegisterScreen() : switch (model.screen) {
           Screen.home => HomeScreen(),
-          Screen.setup => SetupScreen(game: model.setupGame),
+          Screen.create => CreateScreen(),
+          Screen.join => JoinScreen(),
           Screen.room => RoomScreen(),
           Screen.match => MatchScreen(),
           Screen.result => ResultScreen(),

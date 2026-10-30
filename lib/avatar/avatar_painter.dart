@@ -7,10 +7,13 @@ import 'avatar.dart';
 
 /// 棒人間を表示するウィジェット。[bust] なら顔まわりだけのアイコンにする。
 class AvatarView extends StatelessWidget {
-  const AvatarView({super.key, required this.avatar, this.size = 120, this.bust = false, this.mood = AvatarMood.normal, this.onDark = false});
+  const AvatarView({super.key, required this.avatar, this.size = 120, this.bust = false, this.mood = AvatarMood.normal, this.onDark = false, this.look});
 
   final Avatar avatar;
   final double size;
+
+  /// 見ている向き（-1〜1）。指定すると顔がその向きに寄る
+  final Offset? look;
   final bool bust;
   final AvatarMood mood;
 
@@ -23,19 +26,20 @@ class AvatarView extends StatelessWidget {
       child: SizedBox(
         width: bust ? size : size * 0.75,
         height: size,
-        child: CustomPaint(painter: AvatarPainter(avatar, bust: bust, mood: mood, onDark: onDark)),
+        child: CustomPaint(painter: AvatarPainter(avatar, bust: bust, mood: mood, onDark: onDark, look: look)),
       ),
     );
   }
 }
 
 class AvatarPainter extends CustomPainter {
-  AvatarPainter(this.avatar, {this.bust = false, this.mood = AvatarMood.normal, this.onDark = false});
+  AvatarPainter(this.avatar, {this.bust = false, this.mood = AvatarMood.normal, this.onDark = false, this.look});
 
   final Avatar avatar;
   final bool bust;
   final AvatarMood mood;
   final bool onDark;
+  final Offset? look;
 
   // 1単位 = 全身の高さの1/10
   late double u;
@@ -82,7 +86,7 @@ class AvatarPainter extends CustomPainter {
     final faceAt = onigiri ? head + Offset(0, 0.12 * r) : head;
     if (avatar[AvatarPart.top] == 5) _afro(canvas, head, r);
     _head(canvas, head, r);
-    _face(canvas, faceAt, onigiri ? r * 0.85 : r);
+    _face(canvas, faceAt + (look ?? Offset.zero) * (0.28 * r), onigiri ? r * 0.85 : r);
     _top(canvas, crown, crownR);
     if (mood == AvatarMood.win && !bust) _sparkles(canvas, head, r);
   }
@@ -322,5 +326,5 @@ class AvatarPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant AvatarPainter old) =>
-      old.avatar != avatar || old.bust != bust || old.mood != mood || old.onDark != onDark;
+      old.avatar != avatar || old.bust != bust || old.mood != mood || old.onDark != onDark || old.look != look;
 }

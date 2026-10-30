@@ -54,8 +54,10 @@ void main() {
     }
 
     await shot('01-home');
-    model.go(Screen.setup, game: GameKind.badminton);
-    await shot('02-setup');
+    model.go(Screen.create);
+    await shot('02-create');
+    model.go(Screen.join);
+    await shot('02-join');
     model.go(Screen.howto);
     await shot('04-howto');
     var info = const RoomInfo(code: 'KQTE', game: GameKind.volley, phase: RoomPhase.lobby, you: 0, players: [
