@@ -125,10 +125,6 @@ class AppIconPainter extends CustomPainter {
     final r = 0.06 * s;
     canvas.drawCircle(ball, r, Sketch.fill(Colors.white));
     canvas.drawPath(Sketch.circle(ball, r, seed: 2, wobble: 0.04), Sketch.pen(0.022 * s));
-    final p = Sketch.pen(0.012 * s, color: Palette.pencil);
-    for (var i = 0; i < 3; i++) {
-      canvas.drawLine(u(0.56 - i * 0.05, 0.62 - i * 0.035), u(0.585 - i * 0.05, 0.64 - i * 0.035), p);
-    }
   }
 
   @override
