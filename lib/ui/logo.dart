@@ -68,6 +68,15 @@ class _LogoPainter extends CustomPainter {
 
     final f = flight.clamp(0.0, 1.0);
     final ft = math.min(1.0, f / _air);
+    // 飛んでいる間だけ、ボールのすぐ後ろに点線を残す（止まったロゴには出さない）
+    if (ft < 1) {
+      final pen = Sketch.pen(1.6 * k, color: Palette.pencil);
+      final trailTo = ft;
+      for (double t = math.max(0.0, ft - 0.3); t < trailTo; t += 0.012) {
+        if (((t * 1000).round() ~/ 12).isEven) canvas.drawLine(at(t), at(math.min(trailTo, t + 0.007)), pen);
+      }
+    }
+
     var ball = at(ft);
     if (f > _air && f < 1) {
       // 着地後に2回小さく弾む
