@@ -11,14 +11,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets('共通ボタンをキーボードで実行できる', (tester) async {
-    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'registered': true, 'splashSeen': true, 'soundOn': false});
+    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'registered': true, 'soundOn': false});
     final settings = await AppSettings.load();
     final model = AppModel(settings: settings, feedback: GameFeedback(settings));
     tester.view.physicalSize = const Size(1200, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     addTearDown(model.keyboard.dispose);
-    await tester.pumpWidget(PongApp(settings: settings, feedback: model.feedback, model: model));
+    await tester.pumpWidget(PongApp(settings: settings, feedback: model.feedback, model: model, splash: false));
     Focus.of(tester.element(find.text('あそびかた'))).requestFocus();
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
@@ -27,13 +27,13 @@ void main() {
   });
 
   testWidgets('部屋の画面は、相手が参加すると表示が変わる', (tester) async {
-    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'avatar': '0.0.1.0', 'registered': true, 'splashSeen': true});
+    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'avatar': '0.0.1.0', 'registered': true});
     final settings = await AppSettings.load();
     final model = AppModel(settings: settings, feedback: GameFeedback(settings));
     tester.view.physicalSize = const Size(1200, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(PongApp(settings: settings, feedback: model.feedback, model: model));
+    await tester.pumpWidget(PongApp(settings: settings, feedback: model.feedback, model: model, splash: false));
 
     const me = PlayerInfo(present: true, name: 'ゆうた', connected: true);
     model.sessionRoom(const RoomInfo(code: 'KQTE', game: GameKind.volley, phase: RoomPhase.lobby, you: 0, players: [me, PlayerInfo.empty]));
@@ -53,14 +53,14 @@ void main() {
   });
 
   testWidgets('ホームの札から部屋づくり・参加へ進み、あそびかたはタブで切り替える', (tester) async {
-    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'registered': true, 'splashSeen': true, 'soundOn': false});
+    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'registered': true, 'soundOn': false});
     final settings = await AppSettings.load();
     final model = AppModel(settings: settings, feedback: GameFeedback(settings));
     tester.view.physicalSize = const Size(1200, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     addTearDown(model.keyboard.dispose);
-    await tester.pumpWidget(PongApp(settings: settings, feedback: model.feedback, model: model));
+    await tester.pumpWidget(PongApp(settings: settings, feedback: model.feedback, model: model, splash: false));
 
     // ホーム: 左の札から「部屋を作る」は競技えらび、「コードで参加」はコード入力へ
     await tester.tap(find.text('部屋を作る'));

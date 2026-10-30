@@ -19,11 +19,14 @@ Future<void> main() async {
 
 /// テーマはスマホ版 PONG! と同じ（紙・墨・Yomogi）
 class PongApp extends StatelessWidget {
-  const PongApp({super.key, required this.settings, required this.feedback, required this.model});
+  const PongApp({super.key, required this.settings, required this.feedback, required this.model, this.splash = true});
 
   final AppSettings settings;
   final GameFeedback feedback;
   final AppModel model;
+
+  /// 起動時にロゴのスプラッシュを流すか（テストでは切る）
+  final bool splash;
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +57,7 @@ class PongApp extends StatelessWidget {
           textSelectionTheme: const TextSelectionThemeData(cursorColor: Palette.ink),
           sliderTheme: const SliderThemeData(activeTrackColor: Palette.ink, thumbColor: Palette.ink, inactiveTrackColor: Palette.faint),
         ),
-        home: const RootScreen(),
+        home: RootScreen(splash: splash),
       ),
     );
   }

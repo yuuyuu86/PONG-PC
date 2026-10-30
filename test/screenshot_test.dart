@@ -32,13 +32,13 @@ void main() {
       final icons = '$root/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf';
       if (File(icons).existsSync()) await _loadFont('MaterialIcons', icons);
     });
-    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'avatar': '1.0.2.0', 'registered': true, 'splashSeen': true});
+    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'avatar': '1.0.2.0', 'registered': true});
     final settings = await AppSettings.load();
     final model = AppModel(settings: settings, feedback: GameFeedback(settings));
     tester.view.physicalSize = const Size(1200, 800);
     tester.view.devicePixelRatio = 1;
     final key = GlobalKey();
-    await tester.pumpWidget(RepaintBoundary(key: key, child: PongApp(settings: settings, feedback: model.feedback, model: model)));
+    await tester.pumpWidget(RepaintBoundary(key: key, child: PongApp(settings: settings, feedback: model.feedback, model: model, splash: false)));
 
     Future<void> shot(String name) async {
       // 画面の切り替え（クロスフェード）が終わるまで進める
