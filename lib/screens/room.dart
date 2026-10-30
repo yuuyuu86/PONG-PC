@@ -107,13 +107,14 @@ class _RoomScreenState extends State<RoomScreen> {
         maxWidth: 1080,
         children: [
           if (notice != null) ...[DoodleBox(seed: 86, dashed: true, child: StatusLine(state: StatusKind.bad, text: notice)), const SizedBox(height: 16)],
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: left),
-              if (r.you == 0 && !opp.present) ...[const SizedBox(width: 26), const Expanded(child: InvitePanel())],
-            ],
-          ),
+          LayoutBuilder(builder: (context, constraints) {
+            final showInvite = r.you == 0 && !opp.present;
+            if (!showInvite) return left;
+            if (constraints.maxWidth < 800 || MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [left, const SizedBox(height: 24), const InvitePanel()]);
+            }
+            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: left), const SizedBox(width: 26), const Expanded(child: InvitePanel())]);
+          }),
         ],
       ),
     );

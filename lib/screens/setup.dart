@@ -21,6 +21,7 @@ class SetupScreen extends StatefulWidget {
 
 class _SetupScreenState extends State<SetupScreen> {
   final _code = TextEditingController();
+  int _tab = 0;
 
   @override
   void dispose() {
@@ -33,6 +34,87 @@ class _SetupScreenState extends State<SetupScreen> {
     final model = Services.of(context).model;
     final g = widget.game;
     final msg = model.joinMessage;
+    final info = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('${g.summary}\n${g.ruleText}', style: const TextStyle(fontSize: 18, height: 1.5)),
+        const SizedBox(height: 16),
+        DoodleBox(
+          seed: 60,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [const DoodleHeading('そうさ（2台とも同じキー）', size: 19), const SizedBox(height: 8), ControlsList(controls: g.controls)],
+          ),
+        ),
+      ],
+    );
+    // 参加のしかたはタブで切り替える（スマホ版と同じ）
+    final connect = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DoodleTabs(labels: const ['部屋を作る', 'コードで参加'], selected: _tab, seed: 44, onChanged: (i) => setState(() => _tab = i)),
+        const SizedBox(height: 20),
+        if (_tab == 0) ...[
+          const Text('部屋を作ると 4文字のコードが出ます。そのコードを相手に伝えるか、紙飛行機で招待してください。あなたが左の選手になります。',
+              style: TextStyle(fontSize: 17, height: 1.45)),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: 280,
+              child: DoodleButton(
+                label: '部屋を作る',
+                subtitle: 'コードを相手に伝える',
+                icon: Icons.add_home_rounded,
+                primary: true,
+                seed: 41,
+                onPressed: model.busy ? null : () => model.createRoom(g),
+              ),
+            ),
+          ),
+        ] else ...[
+          const Text('相手の画面に出ている英字4文字を入れてください。あなたが右の選手になります。', style: TextStyle(fontSize: 17, height: 1.45)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              SizedBox(
+                width: 190,
+                child: TextField(
+                  controller: _code,
+                  autofocus: true,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 34, letterSpacing: 8),
+                  inputFormatters: [_CodeFormatter()],
+                  decoration: const InputDecoration(
+                    hintText: 'ABCD',
+                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Palette.ink, width: 2.4)),
+                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Palette.ink, width: 3)),
+                  ),
+                  onSubmitted: model.busy ? null : (v) => model.join(v),
+                ),
+              ),
+              const SizedBox(width: 14),
+              SizedBox(width: 130, child: DoodleButton(label: '参加', icon: Icons.login_rounded, seed: 42, onPressed: model.busy ? null : () => model.join(_code.text))),
+            ],
+          ),
+          const SizedBox(height: 22),
+          const NearbyRooms(),
+        ],
+        if (msg != null) ...[
+          const SizedBox(height: 18),
+          DoodleBox(
+            seed: 63,
+            dashed: !msg.error,
+            child: Row(
+              children: [
+                if (!msg.error) ...[const DoodleSpinner(size: 20), const SizedBox(width: 10)],
+                Expanded(child: StatusLine(state: msg.error ? StatusKind.bad : StatusKind.waiting, text: msg.text)),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
     return DoodleScaffold(
       title: 'PONG! ${g.title}',
       onBack: () {
@@ -41,84 +123,13 @@ class _SetupScreenState extends State<SetupScreen> {
       },
       child: PageBody(
         children: [
-          Text('${g.summary}\n${g.ruleText}', style: const TextStyle(fontSize: 18, height: 1.5)),
-          const SizedBox(height: 16),
-          DoodleBox(
-            seed: 60,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [const DoodleHeading('そうさ（2台とも同じキー）', size: 19), const SizedBox(height: 8), ControlsList(controls: g.controls)],
-            ),
-          ),
-          const SizedBox(height: 22),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const DoodleHeading('部屋を作る', size: 21),
-                    const SizedBox(height: 8),
-                    const Text('あなたが左の選手になります。コードを伝えるか、紙飛行機で招待できます。', style: TextStyle(fontSize: 16)),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: 260,
-                      child: DoodleButton(label: '部屋を作る', icon: Icons.add_rounded, primary: true, seed: 61, onPressed: model.busy ? null : () => model.createRoom(g)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 24),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const DoodleHeading('コードで参加', size: 21),
-                    const SizedBox(height: 8),
-                    const Text('相手の画面に出ている英字4文字', style: TextStyle(fontSize: 16)),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 190,
-                          child: TextField(
-                            controller: _code,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 34, letterSpacing: 8),
-                            inputFormatters: [_CodeFormatter()],
-                            decoration: const InputDecoration(
-                              hintText: 'ABCD',
-                              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Palette.ink, width: 2.4)),
-                              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Palette.ink, width: 3)),
-                            ),
-                            onSubmitted: (v) => model.join(v),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        SizedBox(width: 120, child: DoodleButton(label: '参加', seed: 62, onPressed: model.busy ? null : () => model.join(_code.text))),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (msg != null) ...[
-            const SizedBox(height: 18),
-            DoodleBox(
-              seed: 63,
-              dashed: !msg.error,
-              child: Row(
-                children: [
-                  if (!msg.error) ...[const DoodleSpinner(size: 20), const SizedBox(width: 10)],
-                  Expanded(child: StatusLine(state: msg.error ? StatusKind.bad : StatusKind.waiting, text: msg.text)),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 22),
-          const NearbyRooms(),
+          // 狭いウィンドウや大きな文字では縦に並べる
+          LayoutBuilder(builder: (context, constraints) {
+            if (constraints.maxWidth < 760 || MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [connect, const SizedBox(height: 22), info]);
+            }
+            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: info), const SizedBox(width: 32), Expanded(child: connect)]);
+          }),
         ],
       ),
     );

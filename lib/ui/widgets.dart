@@ -7,12 +7,13 @@ import 'doodle.dart';
 
 /// 紙の背景と戻るボタンを持つ共通の画面枠。
 class DoodleScaffold extends StatelessWidget {
-  const DoodleScaffold({super.key, required this.child, this.title, this.showBack = true, this.onBack, this.actions});
+  const DoodleScaffold({super.key, required this.child, this.title, this.showBack = true, this.onBack, this.leading, this.actions});
 
   final Widget child;
   final String? title;
   final bool showBack;
   final VoidCallback? onBack;
+  final Widget? leading;
   final List<Widget>? actions;
 
   @override
@@ -24,7 +25,7 @@ class DoodleScaffold extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (showBack || title != null || actions != null)
+              if (showBack || title != null || leading != null || actions != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 6, 12, 0),
                   child: Row(
@@ -35,6 +36,7 @@ class DoodleScaffold extends StatelessWidget {
                           label: 'もどる',
                           onPressed: onBack ?? () => Navigator.of(context).maybePop(),
                         ),
+                      ?leading,
                       const SizedBox(width: 6),
                       if (title != null)
                         Expanded(
@@ -82,6 +84,15 @@ class DoodleButton extends StatefulWidget {
 
 class _DoodleButtonState extends State<DoodleButton> {
   bool _down = false;
+  bool _focused = false;
+  bool _hovered = false;
+
+  void _activate() {
+    if (widget.onPressed == null) return;
+    Services.of(context).feedback.play(Sound.tap);
+    HapticFeedback.selectionClick();
+    widget.onPressed!();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,17 +102,19 @@ class _DoodleButtonState extends State<DoodleButton> {
       button: true,
       enabled: enabled,
       label: widget.label,
-      child: GestureDetector(
+      child: FocusableActionDetector(
+        enabled: enabled,
+        mouseCursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        onShowFocusHighlight: (value) => setState(() => _focused = value),
+        onShowHoverHighlight: (value) => setState(() => _hovered = value),
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) { _activate(); return null; }),
+        },
+        child: GestureDetector(
         onTapDown: enabled ? (_) => setState(() => _down = true) : null,
         onTapCancel: () => setState(() => _down = false),
         onTapUp: enabled ? (_) => setState(() => _down = false) : null,
-        onTap: enabled
-            ? () {
-                Services.of(context).feedback.play(Sound.tap);
-                HapticFeedback.selectionClick();
-                widget.onPressed!();
-              }
-            : null,
+        onTap: enabled ? _activate : null,
         child: AnimatedSlide(
           duration: const Duration(milliseconds: 60),
           offset: _down ? const Offset(0.006, 0.04) : Offset.zero,
@@ -109,7 +122,8 @@ class _DoodleButtonState extends State<DoodleButton> {
             painter: SketchBorderPainter(
               seed: widget.seed,
               fillColor: widget.primary && enabled ? Palette.ink : Palette.paper,
-              shadow: enabled && !_down,
+              shadow: enabled && !_down && !_hovered,
+              strokeWidth: _focused ? 4 : 2.6,
               dashed: !enabled,
             ),
             child: ConstrainedBox(
@@ -148,6 +162,7 @@ class _DoodleButtonState extends State<DoodleButton> {
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -348,4 +363,99 @@ Future<bool> confirmDialog(BuildContext context, {required String message, requi
     ),
   );
   return result ?? false;
+}
+
+/// 手描きのタブ。選んだタブは黒くぬる（スマホ版 DoodleTabs）。
+/// PC ではマウスのカーソルと、Tab キーでのフォーカス・Enter / Space での切り替えにも対応する。
+class DoodleTabs extends StatelessWidget {
+  const DoodleTabs({super.key, required this.labels, required this.selected, required this.onChanged, this.seed = 70});
+
+  final List<String> labels;
+  final int selected;
+  final ValueChanged<int> onChanged;
+  final int seed;
+
+  @override
+  Widget build(BuildContext context) {
+    // スクロールする画面の中でも、タブの高さをいちばん高いものにそろえる
+    // （stretch だけだと高さの上限がなく、レイアウトが壊れる）
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, label) in labels.indexed) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(child: _DoodleTab(label: label, active: i == selected, seed: seed + i, onTap: () => onChanged(i))),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DoodleTab extends StatefulWidget {
+  const _DoodleTab({required this.label, required this.active, required this.seed, required this.onTap});
+
+  final String label;
+  final bool active;
+  final int seed;
+  final VoidCallback onTap;
+
+  @override
+  State<_DoodleTab> createState() => _DoodleTabState();
+}
+
+class _DoodleTabState extends State<_DoodleTab> {
+  bool _focused = false;
+
+  void _activate() {
+    if (widget.active) return;
+    Services.of(context).feedback.play(Sound.tap);
+    HapticFeedback.selectionClick();
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.active;
+    final fg = active ? Palette.paper : Palette.ink;
+    return Semantics(
+      button: true,
+      selected: active,
+      label: widget.label,
+      excludeSemantics: true,
+      child: FocusableActionDetector(
+        mouseCursor: active ? SystemMouseCursors.basic : SystemMouseCursors.click,
+        onShowFocusHighlight: (value) => setState(() => _focused = value),
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) {
+            _activate();
+            return null;
+          }),
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: active ? null : _activate,
+          child: CustomPaint(
+            painter: SketchBorderPainter(
+              seed: widget.seed,
+              fillColor: active ? Palette.ink : Palette.paper,
+              shadow: false,
+              dashed: !active,
+              strokeWidth: _focused ? 3.6 : 2.2,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 50),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 12, 11),
+                  child: Text(widget.label, textAlign: TextAlign.center, style: TextStyle(fontFamily: kFontFamily, fontSize: 18, color: fg, height: 1.15)),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

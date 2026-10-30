@@ -113,13 +113,16 @@ class PageBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    return Scrollbar(
+      child: SingleChildScrollView(
+      primary: true,
       padding: const EdgeInsets.fromLTRB(28, 12, 28, 32),
       child: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
         ),
+      ),
       ),
     );
   }

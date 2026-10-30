@@ -191,6 +191,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         maxWidth: 1040,
         children: [
           LayoutBuilder(builder: (context, constraints) {
+            final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.3;
             final name = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               const DoodleHeading('なまえ'),
               const SizedBox(height: 10),
@@ -199,7 +200,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 hint: 'プレイヤー',
                 maxLength: AppSettings.maxNameLength,
                 onChanged: (v) {
-                  // 空欄などのときは保存せず、前の名前を残す
                   if (AppSettings.validateName(v) == null) settings.playerName = v;
                   setState(() {});
                 },
@@ -211,9 +211,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             final appearance = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               const DoodleHeading('みため'),
               const SizedBox(height: 12),
-              AvatarEditor(value: settings.avatar, onChanged: (a) => settings.avatar = a),
+              AvatarEditor(value: settings.avatar, onChanged: (a) => settings.avatar = a, horizontal: constraints.maxWidth >= 1000 && !largeText),
             ]);
-            if (constraints.maxWidth < 760 || MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+            if (constraints.maxWidth < 760 || largeText) {
               return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [name, const SizedBox(height: 24), appearance]);
             }
             return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -223,43 +223,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ]);
           }),
         ],
-      ),
-    );
-  }
-}
-
-/// ホームの登録した名前の表示。押すとプロフィールを変えられる（スマホ版 _PlayerBadge）。
-class PlayerBadge extends StatelessWidget {
-  const PlayerBadge({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final s = Services.of(context);
-    return Center(
-      child: Semantics(
-        button: true,
-        label: 'プレイヤー ${s.settings.playerName}。名前と見た目を変える',
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            onTap: () => s.model.go(Screen.profile),
-            child: DoodleBox(
-              seed: 171,
-              dashed: true,
-              padding: const EdgeInsets.fromLTRB(8, 6, 12, 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AvatarIcon(avatar: s.settings.avatar, size: 44),
-                  const SizedBox(width: 10),
-                  Flexible(child: Text(s.settings.playerName, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 19))),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.edit_rounded, color: Palette.pencil, size: 18),
-                ],
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

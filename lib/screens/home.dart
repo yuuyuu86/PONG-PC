@@ -11,7 +11,6 @@ import '../net/discovery.dart';
 import '../ui/doodle.dart';
 import '../ui/logo.dart';
 import '../ui/widgets.dart';
-import 'profile.dart';
 import 'root.dart';
 
 /// ゲーム集トップ
@@ -23,14 +22,24 @@ class HomeScreen extends StatelessWidget {
     final model = Services.of(context).model;
     return DoodleScaffold(
       showBack: false,
+      leading: DoodleIconButton(
+        icon: Icons.tune_rounded,
+        label: '設定',
+        onPressed: () => model.go(Screen.settings),
+      ),
+      actions: [
+        DoodleIconButton(
+          icon: Icons.person_outline_rounded,
+          label: 'プロフィール',
+          onPressed: () => model.go(Screen.profile),
+        ),
+      ],
       child: PageBody(
         maxWidth: 980,
         children: [
           const Center(child: PongLogo(fontSize: 96)),
           const Text('PC 2台で あそぶ 1たい1', textAlign: TextAlign.center, style: TextStyle(fontSize: 20)),
           const SizedBox(height: 10),
-          const PlayerBadge(),
-          const SizedBox(height: 8),
           const Center(child: NearbyStatus()),
           const SizedBox(height: 20),
           LayoutBuilder(builder: (context, c) {
@@ -46,14 +55,7 @@ class HomeScreen extends StatelessWidget {
             );
           }),
           const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(width: 220, child: DoodleButton(label: 'あそびかた', icon: Icons.menu_book_rounded, seed: 31, fontSize: 19, onPressed: () => model.go(Screen.howto))),
-              const SizedBox(width: 16),
-              SizedBox(width: 220, child: DoodleButton(label: '設定', icon: Icons.tune_rounded, seed: 32, fontSize: 19, onPressed: () => model.go(Screen.settings))),
-            ],
-          ),
+          Center(child: SizedBox(width: 220, child: DoodleButton(label: 'あそびかた', icon: Icons.menu_book_rounded, seed: 31, fontSize: 19, onPressed: () => model.go(Screen.howto)))),
         ],
       ),
     );
