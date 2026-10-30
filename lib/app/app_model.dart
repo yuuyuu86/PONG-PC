@@ -305,6 +305,12 @@ class AppModel extends ChangeNotifier implements SessionListener {
     guest?.setReady(v);
   }
 
+  /// 左右を入れ替える（待機中だけ）
+  void swapSides() {
+    host?.swapSides();
+    guest?.swapSides();
+  }
+
   void rematch() {
     host?.rematch();
     guest?.rematch();

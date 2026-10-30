@@ -111,9 +111,9 @@ class _RoomScreenState extends State<RoomScreen> {
             final showInvite = r.you == 0 && !opp.present;
             if (!showInvite) return left;
             if (constraints.maxWidth < 800 || MediaQuery.textScalerOf(context).scale(1) > 1.3) {
-              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [left, const SizedBox(height: 24), SideBySideHint(you: r.you), const SizedBox(height: 24), const InvitePanel()]);
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [left, const SizedBox(height: 24), SideBySideHint(you: r.you, onSwap: model.swapSides), const SizedBox(height: 24), const InvitePanel()]);
             }
-            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: left), const SizedBox(width: 26), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [SideBySideHint(you: r.you), const SizedBox(height: 22), const InvitePanel()]))]);
+            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: left), const SizedBox(width: 26), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [SideBySideHint(you: r.you, onSwap: model.swapSides), const SizedBox(height: 22), const InvitePanel()]))]);
           }),
         ],
       ),
@@ -177,7 +177,7 @@ class PlayersBox extends StatelessWidget {
   /// 1人分: アバター、名前（あなた）、その下に役割と状態
   Widget _row(int side) {
     final p = room.players[side];
-    final role = side == 0 ? 'P1 左（部屋を作った人）' : 'P2 右（参加した人）';
+    final role = side == 0 ? 'P1 左' : 'P2 右';
     final status = !p.present
         ? 'まだいません'
         : !p.connected

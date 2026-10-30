@@ -146,6 +146,31 @@ void main() {
     expect(hostRec.room?.players[1].present, isFalse);
   });
 
+  test('待機中に左右を入れかえると、両方のPCで左右が変わり、入力も入れかわる', () async {
+    final hostRec = Recorder(), guestRec = Recorder();
+    host = HostSession(game: GameKind.fencing, me: const Profile('ホスト', ''), listener: hostRec);
+    await listen();
+    final guest = GuestSession(code: host.code, me: const Profile('ゲスト', ''), listener: guestRec, findHost: (_) => null);
+    await guest.connect(lo, server.port, fingerprint: identity.fingerprint);
+    await waitUntil('参加', () => guestRec.joined == 1 && guestRec.room?.players[1].present == true);
+    expect((hostRec.room?.you, guestRec.room?.you), (0, 1));
+    host.setReady(true);
+    guest.swapSides();
+    await waitUntil('入れかえ', () => hostRec.room?.you == 1 && guestRec.room?.you == 0);
+    expect(guestRec.room?.players[0].name, 'ゲスト');
+    expect(hostRec.room?.players[1].ready, isFalse, reason: '入れかえたら準備OKは取り消す');
+    host.setReady(true);
+    guest.setReady(true);
+    await waitUntil('プレー', () => guestRec.states.isNotEmpty && guestRec.states.last.phase == MatchPhase.play, timeout: const Duration(seconds: 8));
+    // ゲストは左の選手。A（左）で後ろへ下がる＝左へ動く
+    final before = (guestRec.states.last.world as FencingWorld).players[0].x;
+    guest.setKeys(const KeyState(l: true));
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    guest.setKeys(const KeyState());
+    final after = (guestRec.states.last.world as FencingWorld).players[0].x;
+    expect(after, lessThan(before - 10), reason: 'ゲストの入力が左の選手を動かさない');
+  });
+
   test('部屋を作った人が閉じると、参加した側は終了を知らされる', () async {
     final hostRec = Recorder(), guestRec = Recorder();
     host = HostSession(game: GameKind.volley, me: const Profile('ホスト', ''), listener: hostRec);

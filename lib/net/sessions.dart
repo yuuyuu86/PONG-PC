@@ -75,6 +75,9 @@ class HostSession {
   late final String code;
   Profile _me;
   RoomPhase phase = RoomPhase.lobby;
+
+  /// 部屋を作った人が立つ側（0 = 左、1 = 右）。待機中なら入れ替えられる
+  int hostSide = 0;
   _Guest? _guest;
   MatchEngine? engine;
   bool _myReady = false;
@@ -198,6 +201,8 @@ class HostSession {
         if (phase != RoomPhase.lobby) return;
         g.ready = m['value'] == true;
         _checkStart();
+      case 'swap':
+        swapSides();
       case 'rematch':
         if (phase != RoomPhase.result) return;
         g.rematch = true;
@@ -243,6 +248,15 @@ class HostSession {
     if (phase != RoomPhase.lobby) return;
     _myReady = v;
     _checkStart();
+  }
+
+  /// 左右を入れ替える（どちらのPCから頼んでもよい）。並べ方が変わるので、準備OKは取り消す
+  void swapSides() {
+    if (phase != RoomPhase.lobby) return;
+    hostSide = 1 - hostSide;
+    _myReady = false;
+    _guest?.ready = false;
+    broadcastRoom();
   }
 
   void rematch() {
@@ -344,10 +358,9 @@ class HostSession {
     final e = engine;
     if (e == null) return;
     final g = _guest;
-    final inputs = [
-      _myPress.input(_myKeys, connected: true),
-      _guestPress.input(g?.keys ?? const KeyState(), connected: g?.connected ?? false),
-    ];
+    final mine = _myPress.input(_myKeys, connected: true);
+    final theirs = _guestPress.input(g?.keys ?? const KeyState(), connected: g?.connected ?? false);
+    final inputs = hostSide == 0 ? [mine, theirs] : [theirs, mine];
     e.step(inputs, tick);
     final s = e.state;
     g?.link?.send({'t': 'state', 's': s.toJson()});
@@ -362,26 +375,26 @@ class HostSession {
 
   // 部屋の状態 ------------------------------------------------------------
 
-  RoomInfo roomInfo(int side) {
+  /// [forHost] なら自分（部屋を作った人）向け、そうでなければ相手向け
+  RoomInfo roomInfo({required bool forHost}) {
     final g = _guest;
+    final hostP = PlayerInfo(present: true, name: _me.name, avatar: _me.avatar, connected: true, ready: _myReady, rematch: _myRematch);
+    final guestP = g == null ? PlayerInfo.empty : PlayerInfo(present: true, name: g.name, avatar: g.avatar, connected: g.connected, ready: g.ready, rematch: g.rematch);
     return RoomInfo(
       code: code,
       game: game,
       phase: phase,
-      you: side,
-      players: [
-        PlayerInfo(present: true, name: _me.name, avatar: _me.avatar, connected: true, ready: _myReady, rematch: _myRematch),
-        g == null ? PlayerInfo.empty : PlayerInfo(present: true, name: g.name, avatar: g.avatar, connected: g.connected, ready: g.ready, rematch: g.rematch),
-      ],
-      notice: side == 0 ? _notice : null,
+      you: forHost ? hostSide : 1 - hostSide,
+      players: hostSide == 0 ? [hostP, guestP] : [guestP, hostP],
+      notice: forHost ? _notice : null,
       rule: rule,
     );
   }
 
   void broadcastRoom() {
-    listener.sessionRoom(roomInfo(0));
+    listener.sessionRoom(roomInfo(forHost: true));
     final g = _guest;
-    if (g != null && g.connected) g.link?.send({'t': 'room', 'r': roomInfo(1).toJson()});
+    if (g != null && g.connected) g.link?.send({'t': 'room', 'r': roomInfo(forHost: false).toJson()});
   }
 }
 
@@ -518,6 +531,9 @@ class GuestSession {
   }
 
   void setReady(bool v) => _link?.send({'t': 'ready', 'value': v});
+
+  /// 左右の入れ替えを頼む（部屋を作った人のPCが入れ替える）
+  void swapSides() => _link?.send(const {'t': 'swap'});
   void rematch() => _link?.send(const {'t': 'rematch'});
 
   /// 通信が切れた状況を作る（テスト用）

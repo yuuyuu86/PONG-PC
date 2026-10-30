@@ -305,12 +305,15 @@ void drawPlane(Canvas c, Offset at, double angle, {double scale = 1, double flat
 /// 「2台を横に並べてね」の注意書き。左右の画面がつながってコートになるので、並べる向きをイラストで見せる。
 /// [you] は 0 なら左（部屋を作った人）、1 なら右（参加する人）。
 class SideBySideHint extends StatelessWidget {
-  const SideBySideHint({super.key, required this.you});
+  const SideBySideHint({super.key, required this.you, this.onSwap});
   final int you;
+
+  /// 指定すると「左右を入れかえる」ボタンを出す（部屋で待っている間）
+  final VoidCallback? onSwap;
 
   @override
   Widget build(BuildContext context) {
-    final text = you == 0 ? '相手のPCを、このPCの右どなりに置いてください。' : 'このPCを、相手のPCの右どなりに置いてください。';
+    final text = you == 0 ? '相手のPCを、このPCの右どなりに置いてください。' : '相手のPCを、このPCの左どなりに置いてください。';
     return DoodleBox(
       seed: 140,
       child: Column(
@@ -319,6 +322,23 @@ class SideBySideHint extends StatelessWidget {
           const Row(children: [Icon(Icons.info_outline_rounded, color: Palette.ink), SizedBox(width: 8), DoodleHeading('2台を横にならべてね', size: 21)]),
           const SizedBox(height: 10),
           SizedBox(height: 150, child: CustomPaint(painter: _SideBySidePainter(you))),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text.rich(
+                  TextSpan(children: [
+                    const TextSpan(text: 'あなたは '),
+                    TextSpan(text: you == 0 ? '左' : '右', style: const TextStyle(fontSize: 30, decoration: TextDecoration.underline)),
+                    const TextSpan(text: ' の選手'),
+                  ]),
+                  style: const TextStyle(fontSize: 21),
+                ),
+              ),
+              if (onSwap != null)
+                SizedBox(width: 210, child: DoodleButton(label: '左右を入れかえる', icon: Icons.swap_horiz_rounded, fontSize: 17, seed: 143, onPressed: onSwap)),
+            ],
+          ),
           const SizedBox(height: 8),
           Text('$text 2台の画面がつながって、ひとつのコートになります。紙飛行機もとなりの画面へ飛んでいきます。', style: const TextStyle(fontSize: 16, height: 1.45)),
         ],
