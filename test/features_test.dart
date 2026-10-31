@@ -65,4 +65,26 @@ void main() {
     final list = MatchRecord.decodeList(jsonEncode([good, {'g': 'volley'}, 'x', {'at': 'bad', 'g': 'volley'}, good]));
     expect(list, hasLength(2));
   });
+
+  test('2人プレイのお知らせ: 相手の参加・準備・退出・左右の入れかえを知らせる', () async {
+    SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'registered': true, 'soundOn': false});
+    final s = await AppSettings.load();
+    final model = AppModel(settings: s, feedback: GameFeedback(s));
+    addTearDown(model.keyboard.dispose);
+    const me = PlayerInfo(present: true, name: 'ゆうた', connected: true);
+    const hana = PlayerInfo(present: true, name: 'はなこ', connected: true);
+    RoomInfo room(int you, PlayerInfo opp) => RoomInfo(code: 'ABCD', game: GameKind.volley, phase: RoomPhase.lobby, you: you, players: you == 0 ? [me, opp] : [opp, me]);
+    model.sessionRoom(room(0, PlayerInfo.empty));
+    expect(model.toast, isNull);
+    model.sessionRoom(room(0, hana));
+    expect(model.toast?.text, contains('はなこ が部屋に入りました'));
+    model.sessionRoom(room(0, const PlayerInfo(present: true, name: 'はなこ', connected: true, ready: true)));
+    expect(model.toast?.text, contains('準備OK'));
+    model.sessionRoom(room(1, hana));
+    expect(model.toast?.text, contains('あなたは右の選手'));
+    // 相手が抜けると左右も最初（左）に戻る。知らせるのは「抜けた」こと
+    model.sessionRoom(room(0, PlayerInfo.empty));
+    expect(model.toast?.text, contains('はなこ が部屋から出ました'));
+    expect(model.toast?.bad, isTrue);
+  });
 }

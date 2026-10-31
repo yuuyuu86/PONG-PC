@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'app/app_model.dart';
@@ -14,6 +16,7 @@ Future<void> main() async {
   await feedback.init();
   final model = AppModel(settings: settings, feedback: feedback);
   await model.start();
+  unawaited(model.updates.check());
   runApp(PongApp(settings: settings, feedback: feedback, model: model));
 }
 

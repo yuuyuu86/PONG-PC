@@ -5,13 +5,28 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
+import '../app/version.dart';
 import '../games/core/catalog.dart';
 
 enum PeerState { idle, host, full, busy }
 
 /// 同じWi-Fiにいる PONG! のPC
 class Peer {
-  Peer({required this.id, required this.name, required this.avatar, required this.state, this.code, this.game, required this.fingerprint, required this.address, required this.port, required this.lastSeen});
+  Peer({
+    required this.id,
+    required this.name,
+    required this.avatar,
+    required this.state,
+    this.code,
+    this.game,
+    required this.fingerprint,
+    required this.address,
+    required this.port,
+    required this.lastSeen,
+    this.version,
+    this.protocol = AppVersion.protocol,
+    this.features = const {},
+  });
 
   final String id;
   final String name;
@@ -24,7 +39,31 @@ class Peer {
   final int port;
   final DateTime lastSeen;
 
-  bool sameAs(Peer o) => o.id == id && o.name == name && o.avatar == avatar && o.state == state && o.code == code && o.game == game && o.fingerprint == fingerprint && o.port == port;
+  /// 相手のアプリの版（1.1.0 より前の版は知らせてこないので null）
+  final String? version;
+
+  /// 相手の通信の版。違うと参加・対戦できない（通信のしくみが違う古い版は 0）
+  final int protocol;
+
+  /// 相手が対応している、あとから足した機能（[AppVersion.features]）
+  final Set<String> features;
+
+  bool get compatible => protocol == AppVersion.protocol;
+
+  /// 版の表示（知らせてこない古い版は「1.1.0 より前」）
+  String get versionLabel => version ?? '1.1.0 より前';
+
+  bool sameAs(Peer o) =>
+      o.id == id &&
+      o.name == name &&
+      o.avatar == avatar &&
+      o.state == state &&
+      o.code == code &&
+      o.game == game &&
+      o.fingerprint == fingerprint &&
+      o.port == port &&
+      o.version == version &&
+      o.protocol == protocol;
 }
 
 enum DiscoveryStatus { starting, ready, failed }
@@ -68,7 +107,18 @@ class Discovery extends ChangeNotifier {
   List<InternetAddress> _targets = [InternetAddress('255.255.255.255')];
 
   Future<void> start({required String name, required String avatar, required int tcpPort, required String fingerprint}) async {
-    _advert = {'m': _magic, 'id': myId, 'name': name, 'avatar': avatar, 'state': PeerState.idle.name, 'port': tcpPort, 'fp': fingerprint};
+    _advert = {
+      'm': _magic,
+      'id': myId,
+      'name': name,
+      'avatar': avatar,
+      'state': PeerState.idle.name,
+      'port': tcpPort,
+      'fp': fingerprint,
+      'v': AppVersion.app,
+      'pv': AppVersion.protocol,
+      'f': AppVersion.features,
+    };
     try {
       // 同じPCで2つ起動しても受け取れるよう、ポートを共有する（Windows は reuseAddress で共有できる）
       final s = await RawDatagramSocket.bind(InternetAddress.anyIPv4, udpPort, reuseAddress: true, reusePort: !Platform.isWindows);
@@ -204,10 +254,16 @@ class Discovery extends ChangeNotifier {
     while ((d = s.receive()) != null) {
       try {
         final m = jsonDecode(utf8.decode(d!.data));
-        if (m is! Map || m['m'] != _magic || m['id'] == myId) continue;
+        if (m is! Map || m['id'] == myId) continue;
+        final magic = m['m'];
+        if (magic is! String || !magic.startsWith('pong-pc/')) continue;
         final id = m['id'] as String;
+        // 通信のしくみが違う古い版（暗号化の前の pong-pc/1 など）も、一覧には「版が違う」として出す
+        final sameWire = magic == _magic;
         final fingerprint = m['fp'];
-        if (fingerprint is! String || !RegExp(r'^[0-9a-f]{64}$').hasMatch(fingerprint)) continue;
+        final fpOk = fingerprint is String && RegExp(r'^[0-9a-f]{64}$').hasMatch(fingerprint);
+        if (sameWire && !fpOk) continue;
+        final pv = m['pv'];
         final peer = Peer(
           id: id,
           name: (m['name'] as String?) ?? 'PC',
@@ -215,7 +271,11 @@ class Discovery extends ChangeNotifier {
           state: PeerState.values.asNameMap()[m['state']] ?? PeerState.busy,
           code: m['code'] as String?,
           game: GameKind.values.asNameMap()[m['game']],
-          fingerprint: fingerprint,
+          fingerprint: fpOk ? fingerprint : '',
+          version: m['v'] is String ? m['v'] as String : null,
+          // pv を知らせてこない版は、通信の版 1 として扱う（1.1.0 より前の pong-pc/2）
+          protocol: !sameWire ? 0 : (pv is num ? pv.toInt() : 1),
+          features: {for (final f in (m['f'] is List ? m['f'] as List : const [])) '$f'},
           // 同じPCから届いたお知らせ（127.0.0.1 経由など）でも、そのアドレスでつながる
           address: d.address,
           port: (m['port'] as num).toInt(),
@@ -238,6 +298,7 @@ class Discovery extends ChangeNotifier {
     if (_peers.length != before) notifyListeners();
   }
 
+  /// 部屋コードの部屋（版が違っていても返すので、つなぐ前に [Peer.compatible] を確かめる）
   Peer? peerWithCode(String code) {
     for (final p in _peers.values) {
       if (p.code == code && (p.state == PeerState.host || p.state == PeerState.full)) return p;

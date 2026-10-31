@@ -37,8 +37,8 @@ class _RoomScreenState extends State<RoomScreen> {
     }
     final me = r.me, opp = r.opponent;
     final notice = switch (r.notice) {
-      'opponent_left' => '相手が退出しました。新しい相手はこのコードか近くの部屋から参加できます。',
-      'opponent_timeout' => '相手が時間内につなぎ直せなかったため、退出扱いになりました。',
+      'opponent_left' => '相手が部屋から出ました。部屋はそのまま残っています。新しい相手はこのコードか「近くの部屋」から参加できます。',
+      'opponent_timeout' => '相手が時間内につなぎ直せなかったため、部屋から出たことになりました。部屋はそのまま残っています。',
       _ => null,
     };
     final left = Column(
@@ -102,10 +102,21 @@ class _RoomScreenState extends State<RoomScreen> {
       child: PageBody(
         maxWidth: 1080,
         children: [
-          if (notice != null) ...[DoodleBox(seed: 86, dashed: true, child: StatusLine(state: StatusKind.bad, text: notice)), const SizedBox(height: 16)],
+          if (notice != null) ...[
+            DoodleBox(
+              seed: 86,
+              shadow: true,
+              child: Row(children: [
+                const Icon(Icons.person_off_outlined, size: 34, color: Palette.ink),
+                const SizedBox(width: 14),
+                Expanded(child: Text(notice, style: const TextStyle(fontSize: 20, height: 1.4))),
+              ]),
+            ),
+            const SizedBox(height: 16),
+          ],
           LayoutBuilder(builder: (context, constraints) {
             // 2台の並べ方と左右の入れかえは、両方のPCに、相手がそろってからも出す
-            final hint = SideBySideHint(you: r.you, onSwap: model.swapSides);
+            final hint = SideBySideHint(you: r.you, onSwap: r.features.contains('swap') ? model.swapSides : null);
             if (constraints.maxWidth < 800 || MediaQuery.textScalerOf(context).scale(1) > 1.3) {
               return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [left, const SizedBox(height: 24), hint]);
             }

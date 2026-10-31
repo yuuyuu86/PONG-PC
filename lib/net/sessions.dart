@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import '../app/version.dart';
 import '../games/core/catalog.dart';
 import '../games/core/common.dart';
 import '../games/core/match.dart';
@@ -101,6 +102,9 @@ class HostSession {
   /// 新しい接続の最初のメッセージが join だったとき
   void handleJoin(Link link, Msg m) {
     final token = m['token'] as String?;
+    // 通信の版が違う相手は入れない（pv を送ってこない 1.1.0 より前の版は 1）
+    final pv = m['pv'];
+    if ((pv is num ? pv.toInt() : 1) != AppVersion.protocol) return _refuse(link, 'version');
     if (m['code'] != code) return _refuse(link, 'not_found');
     final g = _guest;
     if (token != null && g != null && g.token == token) {
@@ -348,6 +352,7 @@ class HostSession {
       you: forHost ? hostSide : 1 - hostSide,
       players: hostSide == 0 ? [hostP, guestP] : [guestP, hostP],
       notice: forHost ? _notice : null,
+      features: AppVersion.features.toSet(),
       rule: rule,
     );
   }
@@ -400,7 +405,7 @@ class GuestSession {
       return;
     }
     _attach(l);
-    l.send({'t': 'join', 'code': code, 'name': _me.name, 'avatar': _me.avatar, 'token': _token});
+    l.send({'t': 'join', 'code': code, 'name': _me.name, 'avatar': _me.avatar, 'token': _token, 'v': AppVersion.app, 'pv': AppVersion.protocol});
   }
 
   void _attach(Link l) {

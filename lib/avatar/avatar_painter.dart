@@ -91,6 +91,24 @@ class AvatarPainter extends CustomPainter {
     if (mood == AvatarMood.win && !bust) _sparkles(canvas, head, r);
   }
 
+  /// 試合の棒人間に、頭（髪・帽子・顔）だけを描く。[facing] は向き（右 1 / 左 -1）で、顔が少しそちらへ寄る。
+  /// [lineWidth] は体の線の太さ（自分の選手は太い）にそろえる。
+  void paintHead(Canvas canvas, Offset head, double r, {double facing = 0, double lineWidth = 2.6}) {
+    u = lineWidth / 0.3;
+    cx = head.dx;
+    y0 = 0;
+    ink = onDark ? Palette.paper : Palette.ink;
+    paper = onDark ? Palette.ink : Palette.paper;
+    final onigiri = avatar[AvatarPart.head] == 3;
+    final crown = onigiri ? head + Offset(0, -0.4 * r) : head;
+    final crownR = onigiri ? r * 0.72 : r;
+    final faceAt = (onigiri ? head + Offset(0, 0.12 * r) : head) + Offset(facing * 0.2 * r, 0);
+    if (avatar[AvatarPart.top] == 5) _afro(canvas, head, r);
+    _head(canvas, head, r);
+    _face(canvas, faceAt, onigiri ? r * 0.85 : r);
+    _top(canvas, crown, crownR);
+  }
+
   // ---- 線の道具 ----
 
   Paint _pen([double scale = 1]) => Sketch.pen(math.max(1.4, u * 0.3 * scale), color: ink);

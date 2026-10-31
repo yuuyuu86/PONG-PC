@@ -275,7 +275,7 @@ class BoxingPainter extends SportPainter {
           pose.lean = -0.1;
         default:
       }
-      final j = Figure.draw(c, x: b.x, y: Field.ground + bob, dir: dir, own: own, seed: seed, pose: pose, label: info.labels ? (own ? 'あなた' : 'あいて') : null);
+      final j = Figure.draw(c, x: b.x, y: Field.ground + bob, dir: dir, own: own, seed: seed, pose: pose, label: info.labels ? (own ? 'あなた' : 'あいて') : null, avatar: info.avatarOf(s));
       // グローブ（斜線で塗った丸）。自分は太い輪郭
       for (final h in [j.handB, j.handF]) {
         final g = Sketch.circle(h, 11, seed: seed + h.dx.toInt(), wobble: 0.05);

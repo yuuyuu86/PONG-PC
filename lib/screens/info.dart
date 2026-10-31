@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../app/app_model.dart';
 import '../app/feedback.dart';
 import '../app/keyboard.dart';
+import '../app/version.dart';
 import '../app/services.dart';
 import '../games/core/catalog.dart';
 import '../ui/doodle.dart';
@@ -52,7 +53,7 @@ class _HowToScreenState extends State<HowToScreen> {
             for (final (i, s) in _steps.indexed)
               Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('${i + 1}. $s', style: const TextStyle(fontSize: 17, height: 1.45))),
             const SizedBox(height: 6),
-            const Text('バレーとバドミントンは、2台を横に並べるとコートがつながります。左の選手のPCにはネットまでの左半分、右の選手のPCにはネットから右半分が映ります（1台で遊ぶときは設定で「コート全体」に）。フェンシングとボクシングは、どちらの画面にもコート全体が映ります。自分の選手は太い線と、墨で塗った「あなた」の名札、相手は点線の名札「あいて」で見分けられます。',
+            const Text('2台を横に並べるとコートがつながります。左の選手のPCにはコートの左半分、右の選手のPCには右半分が映ります。自分の選手は太い線と、墨で塗った「あなた」の名札、相手は点線の名札「あいて」で見分けられます。',
                 style: TextStyle(fontSize: 16, height: 1.45)),
             const SizedBox(height: 6),
             const Text('通信が切れたら試合は自動で止まり、つながり直すと同じところから続きます。', style: TextStyle(fontSize: 16, height: 1.45)),
@@ -142,30 +143,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 22),
-          DoodleBox(
-            seed: 86,
-            child: ListenableBuilder(
-              listenable: s.settings,
-              builder: (context, _) => Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const DoodleHeading('試合の表示', size: 21),
-                  const SizedBox(height: 6),
-                  const Text('バレーとバドミントンは、2台を横に並べるとコートがつながるよう、半分ずつ映します。1台で確かめるときや、2台を並べられないときは「コート全体」にしてください。フェンシングとボクシングは、いつもコート全体を映します。',
-                      style: TextStyle(fontSize: 15, color: Palette.pencil, height: 1.4)),
-                  const SizedBox(height: 10),
-                  DoodleTabs(
-                    labels: const ['2台で半分ずつ', 'コート全体'],
-                    selected: s.settings.fullCourt ? 1 : 0,
-                    seed: 87,
-                    onChanged: (i) => s.settings.fullCourt = i == 1,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 22),
           const _KeySettings(),
+          const SizedBox(height: 22),
+          ListenableBuilder(
+            listenable: s.model.updates,
+            builder: (context, _) {
+              final u = s.model.updates;
+              final status = u.checking
+                  ? '確かめています…'
+                  : u.latest != null
+                      ? '新しい版 ${u.latest} があります'
+                      : u.upToDate == true
+                          ? 'いまの版が最新です'
+                          : '';
+              return DoodleBox(
+                seed: 91,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('PONG! ${AppVersion.app}', style: const TextStyle(fontSize: 21)),
+                          if (status.isNotEmpty) Text(status, style: const TextStyle(fontSize: 15, color: Palette.pencil)),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      width: 200,
+                      child: u.latest != null
+                          ? DoodleButton(label: 'ダウンロード', icon: Icons.download_rounded, primary: true, fontSize: 17, seed: 92, onPressed: () => u.openDownloadPage())
+                          : DoodleButton(label: '新しい版を確かめる', fontSize: 16, seed: 93, onPressed: u.checking ? null : u.check),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -238,7 +252,7 @@ class _KeySettingsState extends State<_KeySettings> {
                     padding: const EdgeInsets.symmetric(vertical: 5),
                     child: Row(
                       children: [
-                        SizedBox(width: 220, child: Text(a.label, style: const TextStyle(fontSize: 18))),
+                        SizedBox(width: 240, child: Text(a.label, style: const TextStyle(fontSize: 18))),
                         Expanded(
                           child: _waiting == a
                               ? const Text('キーを押してください…', style: TextStyle(fontSize: 18))

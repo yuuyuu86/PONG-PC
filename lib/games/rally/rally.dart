@@ -316,7 +316,7 @@ abstract final class RallyPaint {
       pose.armB = k == null ? -0.6 : -0.8;
     }
     final seed = p.side * 100 + (info.time * 6).floor() % 3; // 少しだけ線がゆらぐ
-    final j = Figure.draw(c, x: p.x, y: p.y, dir: dir, own: own, seed: seed, pose: pose, label: info.labels ? (own ? 'あなた' : 'あいて') : null);
+    final j = Figure.draw(c, x: p.x, y: p.y, dir: dir, own: own, seed: seed, pose: pose, label: info.labels ? (own ? 'あなた' : 'あいて') : null, avatar: info.avatarOf(p.side));
     if (racket) {
       final h = j.handF;
       final ax = math.sin(pose.armF) * dir;

@@ -2,19 +2,25 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../avatar/avatar.dart';
+import '../../avatar/avatar_painter.dart';
 import '../../ui/doodle.dart';
 import 'common.dart';
 import 'match.dart';
 
 /// 描画に渡す情報
 class PaintInfo {
-  const PaintInfo({required this.you, required this.time, required this.phase, this.server});
+  const PaintInfo({required this.you, required this.time, required this.phase, this.server, this.avatars});
 
   /// 自分の側。-1 はカードの縮小図など（名札なし）
   final int you;
   final double time;
   final MatchPhase phase;
   final int? server;
+
+  /// 選手の見た目（左・右）。あれば頭に髪・帽子・顔を描く
+  final List<Avatar>? avatars;
+  Avatar? avatarOf(int side) => avatars == null || side >= avatars!.length ? null : avatars![side];
 
   bool get labels => you >= 0;
 }
@@ -112,7 +118,7 @@ void drawText(Canvas c, String s, Offset at, {double size = 20, Color color = Pa
 
 abstract final class Figure {
   /// 棒人間を描く。自分の選手は太い線（色ではなく線の太さと名札で区別する）。
-  static Joints draw(Canvas c, {required double x, required double y, required double dir, required bool own, required int seed, required Pose pose, String? label}) {
+  static Joints draw(Canvas c, {required double x, required double y, required double dir, required bool own, required int seed, required Pose pose, String? label, Avatar? avatar}) {
     final p = pose;
     final w = own ? 5.2 : 2.6;
     final s = p.scale;
@@ -141,6 +147,12 @@ abstract final class Figure {
     final handF = arm(p.armF, 50, p.armLenF);
 
     final hr = p.headR * s;
+    if (avatar != null && !p.mask) {
+      // 自分で作った見た目（あたま・かお・かみ/ぼうし）を頭に描く
+      AvatarPainter(avatar).paintHead(c, head, hr, facing: dir, lineWidth: w * 0.75);
+      if (label != null) drawLabel(c, Offset(head.dx, head.dy - hr * 1.7 - 10), label, own);
+      return Joints(handF, handB, head);
+    }
     final headPath = Sketch.circle(head, hr, seed: seed + 60);
     c.drawPath(headPath, Sketch.fill(Palette.paper));
     if (p.mask) {

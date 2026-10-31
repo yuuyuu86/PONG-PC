@@ -14,7 +14,21 @@ class AppSettings extends ChangeNotifier {
 
   final SharedPreferences _prefs;
 
-  static Future<AppSettings> load() async => AppSettings._(await SharedPreferences.getInstance());
+  static Future<AppSettings> load() async => AppSettings._(await SharedPreferences.getInstance()).._migrate();
+
+  /// 保存データの形の版。保存する形を変えたら 1 上げ、[_migrate] に古い形からの読み替えを足す。
+  /// （1.1.0 より前は版を持っていないので 0 とみなす。0 → 1 で変わった形はない）
+  static const dataVersion = 1;
+
+  int get savedDataVersion => _prefs.getInt('dataVersion') ?? 0;
+
+  /// 古い版で保存したデータを、いまの形に読み替える。新しい版で保存したデータ（版が大きい）はそのまま使う。
+  void _migrate() {
+    final from = savedDataVersion;
+    if (from >= dataVersion) return;
+    // 例: if (from < 2) { 'records' の形を変える … }
+    _prefs.setInt('dataVersion', dataVersion);
+  }
 
   static const maxNameLength = 12;
 
@@ -64,10 +78,9 @@ class AppSettings extends ChangeNotifier {
     return '${_nameIdeas[r.nextInt(_nameIdeas.length)]}${r.nextInt(90) + 10}';
   }
 
-  /// 試合でコート全体を映す（1台で確かめるときや、2台を並べられないとき）。
-  /// 既定は false で、バレーとバドミントンは2台に半分ずつ映す。
-  bool get fullCourt => _prefs.getBool('fullCourt') ?? false;
-  set fullCourt(bool v) => _set(() => _prefs.setBool('fullCourt', v));
+  /// 「あとで」を押した新しい版（同じ版のお知らせは出さない）
+  String? get dismissedUpdate => _prefs.getString('dismissedUpdate');
+  set dismissedUpdate(String? v) => _set(() => v == null ? _prefs.remove('dismissedUpdate') : _prefs.setString('dismissedUpdate', v));
 
   bool get soundOn => _prefs.getBool('soundOn') ?? true;
   set soundOn(bool v) => _set(() => _prefs.setBool('soundOn', v));

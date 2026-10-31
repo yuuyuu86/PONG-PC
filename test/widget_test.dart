@@ -40,14 +40,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.textContaining('まだいません'), findsOneWidget);
 
-    model.sessionRoom(const RoomInfo(code: 'KQTE', game: GameKind.volley, phase: RoomPhase.lobby, you: 0, players: [
+    model.sessionRoom(const RoomInfo(code: 'KQTE', game: GameKind.volley, phase: RoomPhase.lobby, you: 0, features: {'swap'}, players: [
       me,
       PlayerInfo(present: true, name: 'はなこ', connected: true),
     ]));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.textContaining('はなこ'), findsOneWidget);
+    expect(find.textContaining('はなこ が部屋に入りました'), findsOneWidget, reason: '相手が入ったことを上に知らせる');
+    expect(find.textContaining('はなこ'), findsNWidgets(2));
     expect(find.textContaining('「準備OK」を押してください'), findsOneWidget);
     expect(find.text('左右を入れかえる'), findsOneWidget, reason: '相手がそろってからも左右を入れかえられる');
+    await tester.pump(const Duration(seconds: 4));
+    expect(find.textContaining('はなこ が部屋に入りました'), findsNothing, reason: 'お知らせは数秒で消える');
     model.keyboard.dispose();
   });
 

@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pong_pc/app/app_model.dart';
 import 'package:pong_pc/app/records.dart';
+import 'package:pong_pc/app/updates.dart';
 import 'package:pong_pc/app/feedback.dart';
 import 'package:pong_pc/app/settings.dart';
 import 'package:pong_pc/games/core/catalog.dart';
@@ -35,7 +36,8 @@ void main() {
     });
     SharedPreferences.setMockInitialValues({'playerName': 'ゆうた', 'avatar': '1.0.2.0', 'registered': true});
     final settings = await AppSettings.load();
-    final model = AppModel(settings: settings, feedback: GameFeedback(settings));
+    final model = AppModel(settings: settings, feedback: GameFeedback(settings), updates: UpdateChecker(fetch: () async => ('v1.2.0', 'https://example.com')));
+    await model.updates.check();
     tester.view.physicalSize = const Size(1200, 800);
     tester.view.devicePixelRatio = 1;
     final key = GlobalKey();
@@ -43,6 +45,8 @@ void main() {
 
     ui.Image? last;
     Future<void> shot(String name) async {
+      // 書き出す画像に、状態を切りかえたときのお知らせを写さない
+      model.toast = null;
       // 画面の切り替え（クロスフェード）が終わるまで進める
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
@@ -105,20 +109,20 @@ void main() {
         final png = await pair.toByteData(format: ui.ImageByteFormat.png);
         File('$dir/1$i-match-${game.name}-pair.png').writeAsBytesSync(png!.buffer.asUint8List());
       });
-      if (game == GameKind.volley) {
-        settings.fullCourt = true;
-        await shot('1$i-match-${game.name}-full');
-        settings.fullCourt = false;
-      }
     }
     info = RoomInfo(code: 'KQTE', game: GameKind.volley, phase: RoomPhase.match, you: 0, players: [
       const PlayerInfo(present: true, name: 'ゆうた', avatar: '1.0.2.0', connected: true),
       const PlayerInfo(present: true, name: 'はなこ', avatar: '2.1.4.0', connected: true),
     ]);
     model.sessionRoom(info);
-    final intro = MatchEngine(GameKind.fencing)..step(const [PlayerInput.none, PlayerInput.none], 1 / 60);
+    final intro = MatchEngine(GameKind.volley)..step(const [PlayerInput.none, PlayerInput.none], 1 / 60);
     model.sessionState(intro.state);
     await shot('19-intro');
+    // 半分表示の右の選手: 開始前の案内はコートの外側に出る
+    model.sessionRoom(RoomInfo(code: 'KQTE', game: GameKind.volley, phase: RoomPhase.match, you: 1, players: info.players));
+    model.sessionState((MatchEngine(GameKind.volley)..step(const [PlayerInput.none, PlayerInput.none], 1 / 60)).state);
+    await shot('19-intro-split-right');
+    model.sessionRoom(info);
     final over = MatchEngine(GameKind.volley, firstServer: 0);
     var serve = true;
     while (over.state.phase != MatchPhase.over) {
@@ -140,6 +144,7 @@ void main() {
     }
     model.go(Screen.records);
     await shot('23-records');
+    await tester.pump(const Duration(seconds: 4));
     model.keyboard.dispose();
   }, skip: dir == null);
 }

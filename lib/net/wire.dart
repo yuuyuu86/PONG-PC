@@ -41,7 +41,7 @@ class PlayerInfo {
 
 /// 部屋の状態（待機画面・結果画面の表示に使う）
 class RoomInfo {
-  const RoomInfo({required this.code, required this.game, required this.phase, required this.you, required this.players, this.notice, this.rule});
+  const RoomInfo({required this.code, required this.game, required this.phase, required this.you, required this.players, this.notice, this.rule, this.features = const {}});
 
   static const graceSeconds = 60;
 
@@ -58,6 +58,9 @@ class RoomInfo {
   final int? rule;
   int get ruleValue => rule ?? game.defaultRule;
 
+  /// 部屋を作った人のアプリが対応している機能（AppVersion.features）。古い版からは空
+  final Set<String> features;
+
   PlayerInfo get me => players[you];
   PlayerInfo get opponent => players[1 - you];
 
@@ -69,6 +72,7 @@ class RoomInfo {
         'players': [for (final p in players) p.toJson()],
         'notice': notice,
         'rule': rule,
+        'f': features.toList(),
       };
 
   static RoomInfo fromJson(Msg m) => RoomInfo(
@@ -79,6 +83,7 @@ class RoomInfo {
         players: [for (final p in m['players'] as List) PlayerInfo.fromJson((p as Map).cast<String, Object?>())],
         notice: m['notice'] as String?,
         rule: (m['rule'] as num?)?.toInt(),
+        features: {for (final f in (m['f'] is List ? m['f'] as List : const [])) '$f'},
       );
 }
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../app/app_model.dart';
 import '../app/services.dart';
+import '../app/version.dart';
 import '../games/core/catalog.dart';
 import '../net/discovery.dart';
 import '../net/wire.dart';
@@ -248,11 +249,13 @@ class NearbyRooms extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(
-                      child: StatusLine(state: StatusKind.ok, text: '${p.name} の部屋　${p.game == null ? '' : 'PONG! ${p.game!.title}'}　コード ${p.code}'),
+                      child: p.compatible
+                          ? StatusLine(state: StatusKind.ok, text: '${p.name} の部屋　${p.game == null ? '' : 'PONG! ${p.game!.title}'}　コード ${p.code}')
+                          : StatusLine(state: StatusKind.bad, text: '${p.name} の部屋（版がちがうため参加できません。相手 ${p.versionLabel} / あなた ${AppVersion.app}）'),
                     ),
                     SizedBox(
                       width: 150,
-                      child: DoodleButton(label: '参加する', seed: 64, fontSize: 17, onPressed: model.busy ? null : () => model.join(p.code!)),
+                      child: DoodleButton(label: '参加する', seed: 64, fontSize: 17, onPressed: model.busy || !p.compatible ? null : () => model.join(p.code!)),
                     ),
                   ],
                 ),

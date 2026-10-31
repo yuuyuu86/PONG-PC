@@ -14,6 +14,8 @@ import '../net/sessions.dart';
 import '../net/wire.dart';
 import 'feedback.dart';
 import 'records.dart';
+import 'updates.dart';
+import 'version.dart';
 import 'keyboard.dart';
 import 'settings.dart';
 
@@ -124,7 +126,9 @@ enum Screen { home, create, join, nearby, records, room, match, result, howto, s
 
 /// 画面の流れとセッションをまとめる。タイトル → 対戦準備 → 部屋（待機）→ 試合 → 結果。
 class AppModel extends ChangeNotifier implements SessionListener {
-  AppModel({required this.settings, required this.feedback, Discovery? discovery}) : discovery = discovery ?? Discovery() {
+  AppModel({required this.settings, required this.feedback, Discovery? discovery, UpdateChecker? updates})
+      : discovery = discovery ?? Discovery(),
+        updates = updates ?? UpdateChecker() {
     keyboard = GameKeyboard((k) {
       host?.setKeys(k);
       guest?.setKeys(k);
@@ -134,6 +138,17 @@ class AppModel extends ChangeNotifier implements SessionListener {
   final AppSettings settings;
   final GameFeedback feedback;
   final Discovery discovery;
+  final UpdateChecker updates;
+
+  /// 同じWi-Fiで、自分より新しい版を使っているPCの版（いちばん新しいもの）
+  String? get newerNearby {
+    String? best;
+    for (final p in discovery.peers) {
+      final v = p.version;
+      if (v != null && AppVersion.compare(v, best ?? AppVersion.app) > 0) best = v;
+    }
+    return best;
+  }
   final feed = MatchFeed();
   late final GameKeyboard keyboard;
 
@@ -238,6 +253,12 @@ class AppModel extends ChangeNotifier implements SessionListener {
   void _findRoom(String code, int tries) {
     final peer = discovery.peerWithCode(code);
     if (peer != null) {
+      if (!peer.compatible) {
+        busy = false;
+        joinMessage = (text: versionText(peer.versionLabel), error: true);
+        notifyListeners();
+        return;
+      }
       if (peer.state == PeerState.full) {
         busy = false;
         joinMessage = (text: refusalText('full'), error: true);
@@ -268,7 +289,12 @@ class AppModel extends ChangeNotifier implements SessionListener {
     return p == null ? null : (p.address, p.port, p.fingerprint);
   }
 
+  /// 相手と通信の版が違うとき
+  static String versionText(String theirs) =>
+      '相手の PONG! と版が違うため、いっしょに遊べません（相手 $theirs / あなた ${AppVersion.app}）。2台とも新しい版にそろえてください。';
+
   static String refusalText(String reason) => switch (reason) {
+        'version' => versionText('ちがう版'),
         'full' => 'この部屋にはすでに2人そろっています。別の部屋を作るか、相手にコードを確認してください。',
         'not_found' => '同じWi-Fiにその部屋が見つかりません。コードが合っているか、2台が同じWi-Fiにつながっているか確認してください。',
         'expired' => '部屋がなくなっていました。もう一度、部屋を作るかコードで参加してください。',
@@ -308,6 +334,7 @@ class AppModel extends ChangeNotifier implements SessionListener {
     guest = null;
     room = null;
     oppGoneAt = null;
+    toast = null;
     feed.reset();
     _advertise();
   }
@@ -368,10 +395,55 @@ class AppModel extends ChangeNotifier implements SessionListener {
 
   // SessionListener -------------------------------------------------------
 
+  /// 2人プレイで相手や部屋に起きたことの短いお知らせ（画面の上に数秒出す）
+  ({String text, bool bad, int n})? toast;
+  int _toastN = 0;
+
+  void _toast(String text, {bool bad = false}) {
+    final n = ++_toastN;
+    toast = (text: text, bad: bad, n: n);
+    Timer(const Duration(milliseconds: 3800), () {
+      if (toast?.n != n) return;
+      toast = null;
+      notifyListeners();
+    });
+  }
+
+  /// 前の部屋の状態と比べて、相手の参加・退出・準備・通信、左右の入れかえを知らせる
+  void _announce(RoomInfo? prev, RoomInfo info) {
+    if (prev == null || prev.code != info.code) return;
+    final opp = info.opponent;
+    // 相手は左右を入れかえても prev.opponent で比べられる
+    final before = prev.opponent;
+    final name = opp.name.isEmpty ? '相手' : opp.name;
+    final match = info.phase == RoomPhase.match;
+    if (!before.present && opp.present) {
+      _toast('$name が部屋に入りました');
+    } else if (before.present && !opp.present) {
+      // 相手が抜けると左右も最初に戻るが、知らせるのは「抜けた」こと
+      _toast('${before.name.isEmpty ? '相手' : before.name} が部屋から出ました。新しい相手を待っています', bad: true);
+      feedback.play(Sound.lose, gain: 0.5);
+    } else if (prev.you != info.you) {
+      _toast('左右を入れかえました。あなたは${info.you == 0 ? '左' : '右'}の選手です。2台の置き方も入れかえてください');
+    } else if (opp.present) {
+      // 試合中の通信の切れ・戻りは、試合画面の案内で知らせるので重ねない
+      if (before.connected && !opp.connected && !match) {
+        _toast('$name の通信が切れました。つなぎ直すのを待っています', bad: true);
+      } else if (!before.connected && opp.connected && !match) {
+        _toast('$name がもどってきました');
+      } else if (info.phase == RoomPhase.lobby && prev.phase == RoomPhase.lobby && before.ready != opp.ready) {
+        _toast(opp.ready ? '$name が準備OKを押しました' : '$name が準備OKを取り消しました');
+      } else if (info.phase == RoomPhase.result && !before.rematch && opp.rematch) {
+        _toast('$name がもう一度やりたがっています');
+      }
+    }
+  }
+
   @override
   void sessionRoom(RoomInfo info) {
     final prev = room;
     room = info;
+    _announce(prev, info);
     final opp = info.opponent;
     if (opp.present && !opp.connected) {
       oppGoneAt ??= DateTime.now();

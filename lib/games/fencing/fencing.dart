@@ -247,7 +247,7 @@ class FencingPainter extends SportPainter {
         ..armLenF = 28
         ..mask = true;
       final seed = s * 100 + (info.time * 6).floor() % 3;
-      final j = Figure.draw(c, x: f.x, y: Field.ground, dir: dir, own: own, seed: seed, pose: pose, label: info.labels ? (own ? 'あなた' : 'あいて') : null);
+      final j = Figure.draw(c, x: f.x, y: Field.ground, dir: dir, own: own, seed: seed, pose: pose, label: info.labels ? (own ? 'あなた' : 'あいて') : null, avatar: info.avatarOf(s));
       // 剣: 突きの最中は判定に使った剣先まで伸ばす
       final h = j.handF;
       final tip = FencingRules.bladeTip(f);

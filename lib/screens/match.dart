@@ -18,8 +18,8 @@ import '../ui/widgets.dart';
 import 'root.dart';
 
 /// 試合画面: 上にスコア、真ん中にコート、下に操作の案内。
-/// バレーとバドミントンは、2台を横に並べるとコートがつながるよう、左の選手のPCにはネットまでの左半分、
-/// 右の選手のPCにはネットから右半分を映す（ネットが2台の境目に来る）。設定でコート全体にも切りかえられる。
+/// どの競技も、2台を横に並べるとコートがつながるよう、左の選手のPCにはネットまでの左半分、
+/// 右の選手のPCにはネットから右半分を映す（ネットが2台の境目に来る）。
 class MatchScreen extends StatelessWidget {
   const MatchScreen({super.key});
 
@@ -27,13 +27,32 @@ class MatchScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final model = Services.of(context).model;
     final game = model.room?.game ?? GameKind.volley;
-    final settings = Services.of(context).settings;
-    final split = game.splitCourt && !settings.fullCourt;
+    final split = game.splitCourt;
     final you = model.you;
     final court = Stack(
       children: [
-        Positioned.fill(child: CourtView(feed: model.feed, you: you, split: split)),
-        Positioned.fill(child: _Overlays(game: game)),
+        Positioned.fill(
+          child: CourtView(feed: model.feed, you: you, split: split, avatars: [_avatarOf(model, 0), _avatarOf(model, 1)]),
+        ),
+        // 半分表示では、案内や得点の表示をコートの外側（ネットと反対の空いているところ）に出して、コートを隠さない
+        Positioned.fill(
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final overlays = _Overlays(game: game);
+              if (!split) return overlays;
+              final k = math.min(c.maxWidth / Field.center, c.maxHeight / Field.height);
+              final free = c.maxWidth - Field.center * k;
+              if (free < 320) return overlays;
+              return Row(
+                children: [
+                  if (you == 0) SizedBox(width: free, child: overlays),
+                  const Spacer(),
+                  if (you == 1) SizedBox(width: free, child: overlays),
+                ],
+              );
+            },
+          ),
+        ),
       ],
     );
     return Scaffold(
@@ -78,7 +97,10 @@ class MatchScreen extends StatelessWidget {
 
 /// コート。60fps でホストから届いた最新の状態を描く。
 class CourtView extends StatelessWidget {
-  const CourtView({super.key, required this.feed, required this.you, this.split = false});
+  const CourtView({super.key, required this.feed, required this.you, this.split = false, this.avatars});
+
+  /// 選手の見た目（左・右）
+  final List<Avatar>? avatars;
 
   final MatchFeed feed;
   final int you;
@@ -90,13 +112,21 @@ class CourtView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       label: '試合のコート',
-      child: ClipRect(child: FrameClock(builder: (context, time) => CustomPaint(size: Size.infinite, painter: _CourtPainter(feed, you, time, split: split)))),
+      child: ClipRect(
+        child: FrameClock(
+          builder: (context, time) => CustomPaint(
+            size: Size.infinite,
+            painter: _CourtPainter(feed, you, time, split: split, avatars: avatars),
+          ),
+        ),
+      ),
     );
   }
 }
 
 class _CourtPainter extends CustomPainter {
-  _CourtPainter(this.feed, this.you, this.time, {this.split = false}) : super(repaint: time);
+  _CourtPainter(this.feed, this.you, this.time, {this.split = false, this.avatars}) : super(repaint: time);
+  final List<Avatar>? avatars;
 
   final MatchFeed feed;
   final int you;
@@ -127,7 +157,7 @@ class _CourtPainter extends CustomPainter {
     final painter = s.game.painter;
     painter.paintCourt(canvas);
     final now = time.value;
-    painter.paint(canvas, s.world, PaintInfo(you: you, time: now, phase: s.phase, server: s.server));
+    painter.paint(canvas, s.world, PaintInfo(you: you, time: now, phase: s.phase, server: s.server, avatars: avatars));
     // 得点した瞬間の着地点（IN / OUT）
     final lp = s.lastPoint;
     if (s.phase == MatchPhase.point && lp != null && lp.landX != null) {
@@ -187,21 +217,26 @@ class _MatchHud extends StatelessWidget {
           },
         ),
         Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _ScoreBox(side: 0, you: model.you, score: h.score[0], serving: serveShown && h.server == 0, bar: h.extra?.bars[0], avatar: _avatarOf(model, 0)),
-              SizedBox(
-                width: 190,
-                child: Column(
-                  children: h.extra != null
-                      ? [Text(h.extra!.center, style: const TextStyle(fontSize: 36, height: 1.1)), const Text('有効打の数', style: TextStyle(fontSize: 14))]
-                      : [Text('PONG! ${game.title}', style: const TextStyle(fontSize: 18)), Text(game.ruleLabel(model.room?.ruleValue ?? game.defaultRule), style: const TextStyle(fontSize: 14, color: Palette.pencil))],
+          child: h.extra != null
+              ? _FightHud(model: model, extra: h.extra!, score: h.score)
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _ScoreBox(side: 0, you: model.you, score: h.score[0], serving: serveShown && h.server == 0, bar: h.extra?.bars[0], avatar: _avatarOf(model, 0)),
+                    SizedBox(
+                      width: 190,
+                      child: Column(
+                        children: h.extra != null
+                            ? [Text(h.extra!.center, style: const TextStyle(fontSize: 36, height: 1.1)), const Text('有効打の数', style: TextStyle(fontSize: 14))]
+                            : [
+                                Text('PONG! ${game.title}', style: const TextStyle(fontSize: 18)),
+                                Text(game.ruleLabel(model.room?.ruleValue ?? game.defaultRule), style: const TextStyle(fontSize: 14, color: Palette.pencil)),
+                              ],
+                      ),
+                    ),
+                    _ScoreBox(side: 1, you: model.you, score: h.score[1], serving: serveShown && h.server == 1, bar: h.extra?.bars[1], avatar: _avatarOf(model, 1)),
+                  ],
                 ),
-              ),
-              _ScoreBox(side: 1, you: model.you, score: h.score[1], serving: serveShown && h.server == 1, bar: h.extra?.bars[1], avatar: _avatarOf(model, 1)),
-            ],
-          ),
         ),
         ListenableBuilder(
           listenable: s.settings,
@@ -238,7 +273,15 @@ class _ScoreBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final me = side == you;
     final fg = me ? Palette.paper : Palette.ink;
-    final ball = SizedBox(width: 22, child: serving ? CustomPaint(size: const Size(16, 16), painter: _BallIcon(onDark: me)) : null);
+    final ball = SizedBox(
+      width: 22,
+      child: serving
+          ? CustomPaint(
+              size: const Size(16, 16),
+              painter: _BallIcon(onDark: me),
+            )
+          : null,
+    );
     return Semantics(
       label: '${me ? 'あなた' : 'あいて'} $score点${serving ? '、サーブ' : ''}',
       child: CustomPaint(
@@ -262,7 +305,10 @@ class _ScoreBox extends StatelessWidget {
                       tween: Tween(begin: 1.5, end: 1),
                       duration: const Duration(milliseconds: 350),
                       curve: Curves.easeOut,
-                      builder: (context, k, child) => Transform.rotate(angle: (k - 1) * -0.2, child: Transform.scale(scale: k, child: child)),
+                      builder: (context, k, child) => Transform.rotate(
+                        angle: (k - 1) * -0.2,
+                        child: Transform.scale(scale: k, child: child),
+                      ),
                       child: Text('$score', style: TextStyle(fontSize: 38, color: fg, height: 1.05)),
                     ),
                     if (bar != null) _HpBar(value: bar!, onDark: me),
@@ -296,6 +342,77 @@ class _BallIcon extends CustomPainter {
 }
 
 /// 体力ゲージ（斜線で塗る）
+/// 格闘ゲームのような上部の表示: 左右に長い体力バー、真ん中に時計（ボクシング）
+class _FightHud extends StatelessWidget {
+  const _FightHud({required this.model, required this.extra, required this.score});
+  final AppModel model;
+  final HudExtra extra;
+  final List<int> score;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget side(int i) {
+      final me = i == model.you;
+      final left = i == 0;
+      final name = Row(
+        mainAxisAlignment: left ? MainAxisAlignment.start : MainAxisAlignment.end,
+        children: [
+          if (!left) Text('有効打 ${score[i]}', style: const TextStyle(fontSize: 14, color: Palette.pencil)),
+          if (!left) const SizedBox(width: 10),
+          AvatarIcon(avatar: _avatarOf(model, i), size: 30),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              '${_nameOf(model, i)}${me ? '（あなた）' : ''}',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 17, decoration: me ? TextDecoration.underline : null),
+            ),
+          ),
+          if (left) const SizedBox(width: 10),
+          if (left) Text('有効打 ${score[i]}', style: const TextStyle(fontSize: 14, color: Palette.pencil)),
+        ],
+      );
+      return Column(
+        crossAxisAlignment: left ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          name,
+          const SizedBox(height: 4),
+          TweenAnimationBuilder<double>(
+            tween: Tween(end: extra.bars[i]),
+            duration: const Duration(milliseconds: 200),
+            // 減った分は真ん中（時計）の側から削れていく
+            builder: (context, v, _) => CustomPaint(
+              size: const Size(double.infinity, 22),
+              painter: _HpPainter(v, false, fromRight: !left, thick: me),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 980),
+      child: Row(
+        children: [
+          Expanded(child: side(0)),
+          SizedBox(
+            width: 120,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(extra.center, style: const TextStyle(fontSize: 40, height: 1.05)),
+                Text(model.room?.game.ruleLabel(model.room!.ruleValue) ?? '', style: const TextStyle(fontSize: 13, color: Palette.pencil)),
+              ],
+            ),
+          ),
+          Expanded(child: side(1)),
+        ],
+      ),
+    );
+  }
+}
+
 class _HpBar extends StatelessWidget {
   const _HpBar({required this.value, required this.onDark});
   final double value;
@@ -312,21 +429,28 @@ class _HpBar extends StatelessWidget {
 }
 
 class _HpPainter extends CustomPainter {
-  _HpPainter(this.value, this.onDark);
+  _HpPainter(this.value, this.onDark, {this.fromRight = false, this.thick = false});
   final double value;
   final bool onDark;
+
+  /// 右から満ちる（右の選手のバー）
+  final bool fromRight;
+
+  /// 自分のバーは枠を太く
+  final bool thick;
 
   @override
   void paint(Canvas canvas, Size size) {
     final r = (Offset.zero & size).deflate(1);
     final color = onDark ? Palette.paper : Palette.ink;
-    final fill = Rect.fromLTWH(r.left, r.top, r.width * value.clamp(0, 1), r.height);
+    final w = r.width * value.clamp(0, 1);
+    final fill = Rect.fromLTWH(fromRight ? r.right - w : r.left, r.top, w, r.height);
     Sketch.hatch(canvas, Path()..addRect(fill), fill, gap: 4, width: 1.6, color: color, seed: 5);
-    canvas.drawPath(Sketch.rect(r, seed: 6, wobble: 0.6), Sketch.pen(1.6, color: color));
+    canvas.drawPath(Sketch.rect(r, seed: 6, wobble: 0.6), Sketch.pen(thick ? 3 : 1.6, color: color));
   }
 
   @override
-  bool shouldRepaint(covariant _HpPainter old) => old.value != value || old.onDark != onDark;
+  bool shouldRepaint(covariant _HpPainter old) => old.value != value || old.onDark != onDark || old.fromRight != fromRight || old.thick != thick;
 }
 
 /// 下部: 操作の案内。自分のサーブのときは強調する（スマホ版 _ControlStrip）
@@ -346,16 +470,23 @@ class _ControlStrip extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Center(
-          child: myServe
-              ? const Text('あなたのサーブ！ J で打つ', style: TextStyle(fontSize: 22, color: Palette.paper))
-              : Wrap(
-                  spacing: 18,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    for (final c in game.controls)
-                      Row(mainAxisSize: MainAxisSize.min, children: [Keycap(c.key, size: 13), const SizedBox(width: 6), Text(c.label, style: const TextStyle(fontSize: 15))]),
-                  ],
-                ),
+            child: myServe
+                ? const Text('あなたのサーブ！ J で打つ', style: TextStyle(fontSize: 22, color: Palette.paper))
+                : Wrap(
+                    spacing: 18,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      for (final c in game.controls)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Keycap(c.key, size: 13),
+                            const SizedBox(width: 6),
+                            Text(c.label, style: const TextStyle(fontSize: 15)),
+                          ],
+                        ),
+                    ],
+                  ),
           ),
         ),
       ),
@@ -373,11 +504,16 @@ class _Overlays extends StatelessWidget {
     final model = Services.of(context).model;
     final h = model.feed.hud;
     Widget sheet(List<Widget> children, int seed) => Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: DoodleBox(seed: seed, shadow: true, padding: const EdgeInsets.all(22), child: Column(mainAxisSize: MainAxisSize.min, children: children)),
-          ),
-        );
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: DoodleBox(
+          seed: seed,
+          shadow: true,
+          padding: const EdgeInsets.all(22),
+          child: Column(mainAxisSize: MainAxisSize.min, children: children),
+        ),
+      ),
+    );
     if (h.paused) {
       final opp = model.room?.opponent;
       return sheet([
@@ -385,11 +521,18 @@ class _Overlays extends StatelessWidget {
         const SizedBox(height: 10),
         if (opp != null && opp.present && !opp.connected) ...[
           const Text('相手の通信が切れました。自動でつなぎ直すのを待っています。', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, height: 1.45)),
-          if (model.oppGoneAt != null) Countdown(since: model.oppGoneAt!, builder: (left) => Text('あと $left 秒', style: const TextStyle(fontSize: 18))),
+          if (model.oppGoneAt != null)
+            Countdown(
+              since: model.oppGoneAt!,
+              builder: (left) => Text('あと $left 秒', style: const TextStyle(fontSize: 18)),
+            ),
           const SizedBox(height: 4),
           const Text('つながり直すと 同じところから再開します。', style: TextStyle(fontSize: 15, color: Palette.pencil)),
           const SizedBox(height: 14),
-          SizedBox(width: 260, child: DoodleButton(label: '退出してタイトルへ', seed: 124, onPressed: model.leaveRoom)),
+          SizedBox(
+            width: 260,
+            child: DoodleButton(label: '退出してタイトルへ', seed: 124, onPressed: model.leaveRoom),
+          ),
         ] else
           const Text('通信を確認しています…', style: TextStyle(fontSize: 18)),
       ], 123);
@@ -402,13 +545,20 @@ class _Overlays extends StatelessWidget {
         Text('PONG! ${game.title}', style: const TextStyle(fontSize: 30)),
         const SizedBox(height: 6),
         Text('あなたは${model.you == 0 ? '左' : '右'}の選手（太い線・「あなた」）', style: const TextStyle(fontSize: 17)),
-        Text(game.ruleTextFor(model.room?.ruleValue ?? game.defaultRule), textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, color: Palette.pencil)),
+        Text(
+          game.ruleTextFor(model.room?.ruleValue ?? game.defaultRule),
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 16, color: Palette.pencil),
+        ),
         const SizedBox(height: 8),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             _Fighter(avatar: _avatarOf(model, 0), name: _nameOf(model, 0), caption: '${model.you == 0 ? 'あなた' : 'あいて'}・左'),
-            const Padding(padding: EdgeInsets.symmetric(horizontal: 14), child: Text('VS', style: TextStyle(fontSize: 26))),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14),
+              child: Text('VS', style: TextStyle(fontSize: 26)),
+            ),
             _Fighter(avatar: _avatarOf(model, 1), name: _nameOf(model, 1), caption: '${model.you == 1 ? 'あなた' : 'あいて'}・右'),
           ],
         ),
@@ -429,15 +579,21 @@ class _Overlays extends StatelessWidget {
           tween: Tween(begin: 0.6, end: 1),
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOutBack,
-          builder: (context, k, child) => Transform.rotate(angle: -0.035, child: Transform.scale(scale: k, child: child)),
+          builder: (context, k, child) => Transform.rotate(
+            angle: -0.035,
+            child: Transform.scale(scale: k, child: child),
+          ),
           child: CustomPaint(
             painter: SketchBorderPainter(seed: 130, fillColor: mine ? Palette.ink : Palette.paper),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(28, 6, 32, 12),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(title, style: TextStyle(fontSize: 32, color: mine ? Palette.paper : Palette.ink)),
-                Text(sub, style: TextStyle(fontSize: 16, color: mine ? Palette.paper : Palette.ink)),
-              ]),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, style: TextStyle(fontSize: 32, color: mine ? Palette.paper : Palette.ink)),
+                  Text(sub, style: TextStyle(fontSize: 16, color: mine ? Palette.paper : Palette.ink)),
+                ],
+              ),
             ),
           ),
         ),
@@ -464,7 +620,14 @@ class ResultScreen extends StatelessWidget {
     final Widget status = switch ((opp.present, opp.connected, me.rematch, opp.rematch)) {
       (false, _, _, _) => const Text('×  相手は退出しました', style: TextStyle(fontSize: 17)),
       (_, false, _, _) => const Text('×  相手の通信が切れています。つなぎ直すのを待っています…', style: TextStyle(fontSize: 17)),
-      (_, _, true, false) => const Row(mainAxisSize: MainAxisSize.min, children: [DoodleSpinner(size: 20), SizedBox(width: 10), Text('相手が「もう一度」を押すのを待っています', style: TextStyle(fontSize: 17))]),
+      (_, _, true, false) => const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          DoodleSpinner(size: 20),
+          SizedBox(width: 10),
+          Text('相手が「もう一度」を押すのを待っています', style: TextStyle(fontSize: 17)),
+        ],
+      ),
       (_, _, false, true) => const Text('●  あいては もう一度 やりたがっています', style: TextStyle(fontSize: 17)),
       _ => const SizedBox.shrink(),
     };
@@ -483,7 +646,10 @@ class ResultScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   _FinalScore(label: '${_nameOf(model, 0)}・左', score: h.score[0], isMe: r.you == 0, avatar: r.players[0].look, mood: _mood(h.winner, 0)),
-                  const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Text('-', style: TextStyle(fontSize: 48))),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: Text('-', style: TextStyle(fontSize: 48)),
+                  ),
                   _FinalScore(label: '${_nameOf(model, 1)}・右', score: h.score[1], isMe: r.you == 1, avatar: r.players[1].look, mood: _mood(h.winner, 1)),
                 ],
               ),
@@ -492,7 +658,10 @@ class ResultScreen extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  SizedBox(width: 220, child: DoodleButton(label: 'タイトルへ', seed: 171, onPressed: model.leaveRoom)),
+                  SizedBox(
+                    width: 220,
+                    child: DoodleButton(label: 'タイトルへ', seed: 171, onPressed: model.leaveRoom),
+                  ),
                   const SizedBox(width: 18),
                   SizedBox(
                     width: 280,
@@ -550,10 +719,12 @@ class _FinalScore extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: [
-      AvatarView(avatar: avatar, size: 110, mood: mood),
-      Text(label, style: const TextStyle(fontSize: 17)),
-      Text('$score', style: TextStyle(fontSize: 64, height: 1.1, decoration: isMe ? TextDecoration.underline : null)),
-    ]);
+    return Column(
+      children: [
+        AvatarView(avatar: avatar, size: 110, mood: mood),
+        Text(label, style: const TextStyle(fontSize: 17)),
+        Text('$score', style: TextStyle(fontSize: 64, height: 1.1, decoration: isMe ? TextDecoration.underline : null)),
+      ],
+    );
   }
 }

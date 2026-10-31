@@ -6,6 +6,7 @@ import '../avatar/avatar.dart';
 import '../avatar/avatar_editor.dart';
 import '../avatar/avatar_painter.dart';
 import '../app/services.dart';
+import '../app/version.dart';
 import '../games/core/catalog.dart';
 import '../games/core/common.dart';
 import '../games/core/match.dart';
@@ -117,6 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 12),
+        const UpdateNotice(),
         const _NearbyPanel(),
         const SizedBox(height: 18),
         for (final (i, (label, icon, screen)) in const [
@@ -325,6 +327,58 @@ class _FloorPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
+/// 新しい版のお知らせ（GitHub の最新版、または近くのPCが使っている新しい版）
+class UpdateNotice extends StatelessWidget {
+  const UpdateNotice({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Services.of(context);
+    final model = s.model;
+    return ListenableBuilder(
+      listenable: Listenable.merge([model.updates, model.discovery, s.settings]),
+      builder: (context, _) {
+        final latest = model.updates.latest;
+        final nearby = model.newerNearby;
+        final String text;
+        String? dismiss;
+        if (latest != null && latest != s.settings.dismissedUpdate) {
+          text = '新しい版 $latest があります（いまは ${AppVersion.app}）';
+          dismiss = latest;
+        } else if (nearby != null) {
+          text = '近くのPCは新しい版 $nearby を使っています。いっしょに遊ぶには、新しい版にしてください。';
+        } else {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: DoodleBox(
+            seed: 75,
+            shadow: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(children: [const Icon(Icons.system_update_alt_rounded, color: Palette.ink), const SizedBox(width: 8), Expanded(child: Text(text, style: const TextStyle(fontSize: 16, height: 1.4)))]),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (dismiss != null) ...[
+                      SizedBox(width: 100, child: DoodleButton(label: 'あとで', fontSize: 16, seed: 76, onPressed: () => s.settings.dismissedUpdate = dismiss)),
+                      const SizedBox(width: 10),
+                    ],
+                    Flexible(child: DoodleButton(label: 'ダウンロード', primary: true, fontSize: 16, seed: 77, onPressed: () => model.updates.openDownloadPage())),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// 右側: 同じWi-Fiにいる PONG! の一覧
 class _NearbyPanel extends StatelessWidget {
   const _NearbyPanel();
@@ -358,7 +412,7 @@ class _NearbyPanel extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(child: Text(p.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18))),
                         Text(
-                          switch (p.state) {
+                          !p.compatible ? '版がちがう（${p.versionLabel}）' : switch (p.state) {
                             PeerState.host => '部屋あり',
                             PeerState.full => '満員',
                             PeerState.busy => '試合中',

@@ -1,5 +1,6 @@
 # テストと、Windows（x64）/ Mac（Apple シリコン + Intel のユニバーサル）版のビルド。
 # できあがったアプリは各ジョブの Artifacts からダウンロードできる。
+# v1.2.0 のようなタグを push すると、GitHub Releases に配布用のファイルを置く（README「新しい版を出す」）。
 name: build
 
 on:
@@ -33,6 +34,14 @@ jobs:
         with:
           name: PONG-windows-x64
           path: build/windows/x64/runner/Release/
+      - if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath PONG-windows-x64.zip
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: PONG-windows-x64.zip
 
   macos:
     runs-on: macos-latest
@@ -48,3 +57,39 @@ jobs:
         with:
           name: PONG-macos-universal
           path: PONG-macos-universal.zip
+      - if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir dmg
+          cp -R "build/macos/Build/Products/Release/PONG!.app" dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "PONG!" -srcfolder dmg -ov -format UDZO PONG-macos-universal.dmg
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: PONG-macos-universal.dmg
+
+  # タグ（v1.2.0 など）のときだけ: 版の番号を確かめ、Releases に置く
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: タグと pubspec.yaml の版が同じか確かめる
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          ver="$(grep '^version:' pubspec.yaml | sed -E 's/version: *([^+]*).*/\1/')"
+          test "$tag" = "$ver" || { echo "タグ $tag と pubspec.yaml の $ver が違います"; exit 1; }
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            PONG-windows-x64.zip
+            PONG-macos-universal.dmg
+          generate_release_notes: true

@@ -173,6 +173,19 @@ void main() {
     await waitUntil('左に戻る', () => hostRec.room?.you == 0);
   });
 
+  test('通信の版が違う相手は、理由をつけて断る', () async {
+    final rec = Recorder();
+    host = HostSession(game: GameKind.volley, me: const Profile('ホスト', ''), listener: Recorder());
+    await listen();
+    final link = await Link.connect(lo, server.port, expectedFingerprint: identity.fingerprint);
+    Msg? reply;
+    link!.onMessage = (m) => reply = m;
+    link.send({'t': 'join', 'code': host.code, 'name': '未来', 'avatar': '', 'pv': 99});
+    await waitUntil('断られる', () => reply != null);
+    expect(reply!['reason'], 'version');
+    expect(rec.failures, isEmpty);
+  });
+
   test('部屋を作った人が閉じると、参加した側は終了を知らされる', () async {
     final hostRec = Recorder(), guestRec = Recorder();
     host = HostSession(game: GameKind.volley, me: const Profile('ホスト', ''), listener: hostRec);

@@ -61,23 +61,31 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
         if (_splash) {
           return SplashScreen(onLand: () => Services.of(context).feedback.play(Sound.bounce), onDone: () => setState(() => _splash = false));
         }
-        final screen = !settings.registered ? RegisterScreen() : switch (model.screen) {
-          Screen.home => HomeScreen(),
-          Screen.create => CreateScreen(),
-          Screen.join => JoinScreen(),
-          Screen.nearby => JoinScreen(nearby: true),
-          Screen.room => RoomScreen(),
-          Screen.match => MatchScreen(),
-          Screen.result => ResultScreen(),
-          Screen.howto => HowToScreen(),
-          Screen.records => RecordsScreen(),
-          Screen.settings => SettingsScreen(),
-          Screen.profile => ProfileScreen(),
-        };
+        final screen = !settings.registered
+            ? RegisterScreen()
+            : switch (model.screen) {
+                Screen.home => HomeScreen(),
+                Screen.create => CreateScreen(),
+                Screen.join => JoinScreen(),
+                Screen.nearby => JoinScreen(nearby: true),
+                Screen.room => RoomScreen(),
+                Screen.match => MatchScreen(),
+                Screen.result => ResultScreen(),
+                Screen.howto => HowToScreen(),
+                Screen.records => RecordsScreen(),
+                Screen.settings => SettingsScreen(),
+                Screen.profile => ProfileScreen(),
+              };
         return Stack(
           children: [
-            Positioned.fill(child: AnimatedSwitcher(duration: const Duration(milliseconds: 150), child: KeyedSubtree(key: ValueKey(model.screen), child: screen))),
+            Positioned.fill(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 150),
+                child: KeyedSubtree(key: ValueKey(model.screen), child: screen),
+              ),
+            ),
             if (model.connection != null) Positioned.fill(child: ConnectionOverlay(problem: model.connection!)),
+            if (model.toast != null && model.connection == null) Positioned(top: 70, left: 0, right: 0, child: Center(child: ToastBanner(key: ValueKey(model.toast!.n), text: model.toast!.text, bad: model.toast!.bad))),
           ],
         );
       },
@@ -105,7 +113,9 @@ class ControlsList extends StatelessWidget {
               children: [
                 Keycap(Services.of(context).settings.keys.describe(c.key), size: size - 2),
                 const SizedBox(width: 10),
-                Flexible(child: Text(c.label, style: TextStyle(fontSize: size))),
+                Flexible(
+                  child: Text(c.label, style: TextStyle(fontSize: size)),
+                ),
               ],
             ),
           ),
@@ -125,14 +135,14 @@ class PageBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scrollbar(
       child: SingleChildScrollView(
-      primary: true,
-      padding: const EdgeInsets.fromLTRB(28, 12, 28, 32),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+        primary: true,
+        padding: const EdgeInsets.fromLTRB(28, 12, 28, 32),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+          ),
         ),
-      ),
       ),
     );
   }
@@ -147,29 +157,36 @@ class ConnectionOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final model = Services.of(context).model;
-    return ColoredBox(
-      color: Palette.paper.withValues(alpha: 0.8),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: DoodleBox(
-            seed: 140,
-            shadow: true,
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(problem.title, style: const TextStyle(fontSize: 28)),
-                const SizedBox(height: 12),
-                if (!problem.isFinal) ...[const DoodleSpinner(size: 30), const SizedBox(height: 12)],
-                Text(problem.body, textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, height: 1.45)),
-                if (problem.since != null) ...[
-                  const SizedBox(height: 8),
-                  Countdown(since: problem.since!, builder: (left) => Text('あと $left 秒まで待ちます', style: const TextStyle(fontSize: 16, color: Palette.pencil))),
+    // 画面の外側（Scaffold の外）に重ねるので、Material で包んでアプリと同じ文字（Yomogi）にする
+    return Material(
+      type: MaterialType.transparency,
+      child: ColoredBox(
+        color: Palette.paper.withValues(alpha: 0.8),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: DoodleBox(
+              seed: 140,
+              shadow: true,
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(problem.title, style: const TextStyle(fontSize: 28)),
+                  const SizedBox(height: 12),
+                  if (!problem.isFinal) ...[const DoodleSpinner(size: 30), const SizedBox(height: 12)],
+                  Text(problem.body, textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, height: 1.45)),
+                  if (problem.since != null) ...[
+                    const SizedBox(height: 8),
+                    Countdown(
+                      since: problem.since!,
+                      builder: (left) => Text('あと $left 秒まで待ちます', style: const TextStyle(fontSize: 16, color: Palette.pencil)),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  DoodleButton(label: problem.isFinal ? 'タイトルへ戻る' : 'あきらめてタイトルへ', primary: problem.isFinal, seed: 141, onPressed: model.leaveRoom),
                 ],
-                const SizedBox(height: 18),
-                DoodleButton(label: problem.isFinal ? 'タイトルへ戻る' : 'あきらめてタイトルへ', primary: problem.isFinal, seed: 141, onPressed: model.leaveRoom),
-              ],
+              ),
             ),
           ),
         ),
@@ -187,10 +204,7 @@ class Countdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder(
-      stream: Stream.periodic(const Duration(milliseconds: 500)),
-      builder: (context, _) => builder(math.max(0, RoomInfo.graceSeconds - DateTime.now().difference(since).inSeconds)),
-    );
+    return StreamBuilder(stream: Stream.periodic(const Duration(milliseconds: 500)), builder: (context, _) => builder(math.max(0, RoomInfo.graceSeconds - DateTime.now().difference(since).inSeconds)));
   }
 }
 
@@ -211,7 +225,13 @@ class SideBySideHint extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Row(children: [Icon(Icons.info_outline_rounded, color: Palette.ink), SizedBox(width: 8), DoodleHeading('2台を横にならべてね', size: 21)]),
+          const Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: Palette.ink),
+              SizedBox(width: 8),
+              DoodleHeading('2台を横にならべてね', size: 21),
+            ],
+          ),
           const SizedBox(height: 10),
           SizedBox(height: 150, child: CustomPaint(painter: _SideBySidePainter(you))),
           const SizedBox(height: 8),
@@ -219,20 +239,28 @@ class SideBySideHint extends StatelessWidget {
             children: [
               Expanded(
                 child: Text.rich(
-                  TextSpan(children: [
-                    const TextSpan(text: 'あなたは '),
-                    TextSpan(text: you == 0 ? '左' : '右', style: const TextStyle(fontSize: 30, decoration: TextDecoration.underline)),
-                    const TextSpan(text: ' の選手'),
-                  ]),
+                  TextSpan(
+                    children: [
+                      const TextSpan(text: 'あなたは '),
+                      TextSpan(
+                        text: you == 0 ? '左' : '右',
+                        style: const TextStyle(fontSize: 30, decoration: TextDecoration.underline),
+                      ),
+                      const TextSpan(text: ' の選手'),
+                    ],
+                  ),
                   style: const TextStyle(fontSize: 21),
                 ),
               ),
               if (onSwap != null)
-                SizedBox(width: 210, child: DoodleButton(label: '左右を入れかえる', icon: Icons.swap_horiz_rounded, fontSize: 17, seed: 143, onPressed: onSwap)),
+                SizedBox(
+                  width: 210,
+                  child: DoodleButton(label: '左右を入れかえる', icon: Icons.swap_horiz_rounded, fontSize: 17, seed: 143, onPressed: onSwap),
+                ),
             ],
           ),
           const SizedBox(height: 8),
-          Text('$text バレーとバドミントンは2台の画面がつながって、ひとつのコートになります（ネットが境目）。', style: const TextStyle(fontSize: 16, height: 1.45)),
+          Text('$text 2台の画面がつながって、ひとつのコートになります（真ん中が境目）。', style: const TextStyle(fontSize: 16, height: 1.45)),
         ],
       ),
     );
@@ -258,16 +286,14 @@ class _SideBySidePainter extends CustomPainter {
       final screen = Rect.fromLTWH(x, top, w, h);
       canvas.drawPath(Sketch.rect(screen, seed: 141 + i), Sketch.fill(i == you ? Palette.paperShade : Palette.paper));
       Sketch.strokeTwice(canvas, (s) => Sketch.rect(screen, seed: s), pen, seed: 141 + i);
-      final base = Sketch.polygon([
-        Offset(x - 8, top + h + 18),
-        Offset(x + w + 8, top + h + 18),
-        Offset(x + w, top + h + 4),
-        Offset(x, top + h + 4),
-      ], seed: 150 + i);
+      final base = Sketch.polygon([Offset(x - 8, top + h + 18), Offset(x + w + 8, top + h + 18), Offset(x + w, top + h + 4), Offset(x, top + h + 4)], seed: 150 + i);
       canvas.drawPath(base, pen);
       // ラベル
       final tp = TextPainter(
-        text: TextSpan(text: i == you ? 'このPC' : '相手のPC', style: const TextStyle(fontFamily: kFontFamily, fontSize: 15, color: Palette.ink)),
+        text: TextSpan(
+          text: i == you ? 'このPC' : '相手のPC',
+          style: const TextStyle(fontFamily: kFontFamily, fontSize: 15, color: Palette.ink),
+        ),
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(x + (w - tp.width) / 2, top + h + 22));
@@ -296,4 +322,44 @@ class _SideBySidePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SideBySidePainter old) => old.you != you;
+}
+
+/// 画面の上に数秒出すお知らせ（相手が入った・出た・準備OK など）
+class ToastBanner extends StatelessWidget {
+  const ToastBanner({super.key, required this.text, this.bad = false});
+  final String text;
+  final bool bad;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: Semantics(
+        liveRegion: true,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1),
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutBack,
+          builder: (context, k, child) => Opacity(opacity: k.clamp(0, 1), child: Transform.translate(offset: Offset(0, (1 - k) * -24), child: child)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: CustomPaint(
+              painter: SketchBorderPainter(seed: 150, fillColor: bad ? Palette.paper : Palette.ink),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 24, 14),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(bad ? Icons.error_outline_rounded : Icons.campaign_outlined, color: bad ? Palette.ink : Palette.paper),
+                    const SizedBox(width: 10),
+                    Flexible(child: Text(text, style: TextStyle(fontSize: 19, color: bad ? Palette.ink : Palette.paper))),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

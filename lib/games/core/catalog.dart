@@ -82,10 +82,8 @@ enum GameKind {
         boxing => const BoxingPainter(),
       };
 
-  /// 2台を並べたとき、コートを半分ずつ映すか。
-  /// フェンシングとボクシングは中央付近で間合いを取り合うので、境目（画面のふち）で
-  /// 2人や突き・パンチが切れてしまい遊びにくい。この2つは両方のPCにコート全体を映す。
-  bool get splitCourt => this == volley || this == badminton;
+  /// 2台を並べたとき、コートを半分ずつ映すか（いまは全競技。2台の画面がつながって1つのコートになる）
+  bool get splitCourt => true;
 
   /// 部屋を作るときに選べるルール。ボクシングは試合時間（秒）、ほかは何点先取か。
   List<int> get ruleChoices => this == boxing ? const [30, 60, 90] : const [3, 5, 7, 11];
