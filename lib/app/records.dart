@@ -20,7 +20,7 @@ class MatchRecord {
   Map<String, Object?> toJson() => {'at': at.millisecondsSinceEpoch, 'g': game.name, 'r': rule, 'o': opponent, 'oa': opponentAvatar, 'm': myScore, 'os': opponentScore, 'w': won};
 
   static MatchRecord? fromJson(Object? raw) {
-    if (raw is! Map) return null;
+    if (raw is! Map || raw['at'] is! num) return null;
     final game = GameKind.values.asNameMap()[raw['g']];
     if (game == null) return null;
     return MatchRecord(
@@ -37,8 +37,18 @@ class MatchRecord {
 
   static List<MatchRecord> decodeList(String? raw) {
     if (raw == null) return [];
+    // 壊れた記録が1件あっても、ほかの記録は読めるようにする
     try {
-      return [for (final e in jsonDecode(raw) as List) ?MatchRecord.fromJson(e)];
+      final list = jsonDecode(raw);
+      if (list is! List) return [];
+      final out = <MatchRecord>[];
+      for (final e in list) {
+        try {
+          final r = MatchRecord.fromJson(e);
+          if (r != null) out.add(r);
+        } catch (_) {}
+      }
+      return out;
     } catch (_) {
       return [];
     }

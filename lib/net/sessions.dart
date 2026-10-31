@@ -197,6 +197,8 @@ class HostSession {
     _stopLoop();
     engine = null;
     phase = RoomPhase.lobby;
+    // 次に入ってくる人は右の選手として案内しているので、左右を最初に戻す
+    hostSide = 0;
     _myReady = false;
     _myRematch = false;
     _notice = notice;

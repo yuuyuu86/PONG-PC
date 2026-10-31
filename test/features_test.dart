@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pong_pc/app/app_model.dart';
 import 'package:pong_pc/app/feedback.dart';
 import 'package:pong_pc/app/keyboard.dart';
+import 'package:pong_pc/app/records.dart';
 import 'package:pong_pc/app/settings.dart';
 import 'package:pong_pc/games/boxing/boxing.dart';
 import 'package:pong_pc/games/core/catalog.dart';
@@ -55,5 +58,11 @@ void main() {
     expect(r, hasLength(1));
     expect(r.single.won, isTrue);
     expect((r.single.myScore, r.single.opponentScore, r.single.opponent, r.single.rule), (7, 3, 'はなこ', 7));
+  });
+
+  test('対戦結果: 壊れた記録が混ざっていても、ほかの記録は読める', () {
+    const good = {'at': 1, 'g': 'volley', 'r': 5, 'o': 'はなこ', 'oa': '', 'm': 5, 'os': 2, 'w': true};
+    final list = MatchRecord.decodeList(jsonEncode([good, {'g': 'volley'}, 'x', {'at': 'bad', 'g': 'volley'}, good]));
+    expect(list, hasLength(2));
   });
 }

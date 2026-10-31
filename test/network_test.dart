@@ -166,6 +166,11 @@ void main() {
     guest.setKeys(const KeyState());
     final after = (guestRec.states.last.world as FencingWorld).players[0].x;
     expect(after, lessThan(before - 10), reason: 'ゲストの入力が左の選手を動かさない');
+
+    // 相手が抜けたら左右は最初に戻る（次の人は右の選手として参加する）
+    guest.leave();
+    await waitUntil('退出', () => hostRec.room?.players[1].present == false || hostRec.room?.players[0].present == false);
+    await waitUntil('左に戻る', () => hostRec.room?.you == 0);
   });
 
   test('部屋を作った人が閉じると、参加した側は終了を知らされる', () async {
