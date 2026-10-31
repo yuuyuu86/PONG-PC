@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../app/app_model.dart';
 import '../app/services.dart';
-import '../avatar/avatar.dart';
-import '../avatar/avatar_editor.dart';
 import '../avatar/avatar_painter.dart';
-import '../net/discovery.dart';
 import '../net/wire.dart';
 import '../ui/doodle.dart';
 import '../ui/widgets.dart';
 import 'root.dart';
 
-/// 部屋（作成・待機）。部屋を作った人はコードを見せるか、紙飛行機で招待する。
+/// 部屋（作成・待機）。部屋を作った人はコードを見せて相手を待つ。
 class RoomScreen extends StatefulWidget {
   const RoomScreen({super.key});
 
@@ -41,7 +37,7 @@ class _RoomScreenState extends State<RoomScreen> {
     }
     final me = r.me, opp = r.opponent;
     final notice = switch (r.notice) {
-      'opponent_left' => '相手が退出しました。新しい相手はこのコードか招待で参加できます。',
+      'opponent_left' => '相手が退出しました。新しい相手はこのコードか近くの部屋から参加できます。',
       'opponent_timeout' => '相手が時間内につなぎ直せなかったため、退出扱いになりました。',
       _ => null,
     };
@@ -108,12 +104,12 @@ class _RoomScreenState extends State<RoomScreen> {
         children: [
           if (notice != null) ...[DoodleBox(seed: 86, dashed: true, child: StatusLine(state: StatusKind.bad, text: notice)), const SizedBox(height: 16)],
           LayoutBuilder(builder: (context, constraints) {
-            final showInvite = r.you == 0 && !opp.present;
-            if (!showInvite) return left;
+            // 2台の並べ方と左右の入れかえは、両方のPCに、相手がそろってからも出す
+            final hint = SideBySideHint(you: r.you, onSwap: model.swapSides);
             if (constraints.maxWidth < 800 || MediaQuery.textScalerOf(context).scale(1) > 1.3) {
-              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [left, const SizedBox(height: 24), SideBySideHint(you: r.you, onSwap: model.swapSides), const SizedBox(height: 24), const InvitePanel()]);
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [left, const SizedBox(height: 24), hint]);
             }
-            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: left), const SizedBox(width: 26), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [SideBySideHint(you: r.you, onSwap: model.swapSides), const SizedBox(height: 22), const InvitePanel()]))]);
+            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: left), const SizedBox(width: 26), Expanded(child: hint)]);
           }),
         ],
       ),
@@ -204,168 +200,6 @@ class PlayersBox extends StatelessWidget {
         ),
         SizedBox(width: 170, child: StatusLine(state: !p.present ? StatusKind.waiting : !p.connected ? StatusKind.bad : StatusKind.ok, text: status)),
       ],
-    );
-  }
-}
-
-/// 紙飛行機で招待: 同じWi-Fiで部屋に入っていないPCの一覧
-class InvitePanel extends StatelessWidget {
-  const InvitePanel({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final model = Services.of(context).model;
-    return DoodleBox(
-      seed: 95,
-      shadow: true,
-      child: ListenableBuilder(
-        listenable: model.discovery,
-        builder: (context, _) {
-          final peers = model.invitablePeers;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(children: [Icon(Icons.send_rounded, color: Palette.ink), SizedBox(width: 8), DoodleHeading('紙飛行機で招待', size: 22)]),
-              const SizedBox(height: 10),
-              const Text('近くのPCを選ぶと、紙飛行機が画面の右から飛び出して、相手の画面に招待状を届けます。', style: TextStyle(fontSize: 16, height: 1.45)),
-              const SizedBox(height: 12),
-              if (peers.isEmpty)
-                const Row(children: [DoodleSpinner(size: 20), SizedBox(width: 10), Flexible(child: Text('同じWi-Fiで PONG! を開いているPCを探しています…', style: TextStyle(fontSize: 16)))])
-              else
-                for (final p in peers) _PeerRow(peer: p),
-              if (model.inviteStatus != null) ...[
-                const SizedBox(height: 8),
-                Text(model.inviteStatus!, style: const TextStyle(fontSize: 16, color: Palette.pencil)),
-              ],
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _PeerRow extends StatelessWidget {
-  const _PeerRow({required this.peer});
-  final Peer peer;
-
-  @override
-  Widget build(BuildContext context) {
-    final model = Services.of(context).model;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Expanded(child: PlayerTag(avatar: Avatar.decode(peer.avatar), name: peer.name, iconSize: 40)),
-          Builder(
-            builder: (btnContext) => SizedBox(
-              width: 190,
-              child: DoodleButton(
-                label: '招待を送る',
-                icon: Icons.send_rounded,
-                primary: true,
-                fontSize: 18,
-                seed: 96,
-                onPressed: () {
-                  // 紙飛行機はボタンの位置から飛び立つ
-                  final box = btnContext.findRenderObject() as RenderBox?;
-                  final from = box == null ? Offset.zero : box.localToGlobal(box.size.center(Offset.zero));
-                  model.sendInvite(peer, from: from, window: MediaQuery.sizeOf(context));
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 届いた招待状（紙飛行機が開いたもの）
-class InviteLetter extends StatelessWidget {
-  const InviteLetter({super.key, required this.invite});
-  final IncomingInvite invite;
-
-  @override
-  Widget build(BuildContext context) {
-    final model = Services.of(context).model;
-    return ColoredBox(
-      color: Colors.black.withValues(alpha: 0.18),
-      child: Center(
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: 1),
-          duration: const Duration(milliseconds: 380),
-          curve: Curves.easeOutBack,
-          builder: (context, k, child) => Opacity(
-            opacity: k.clamp(0, 1),
-            child: Transform.rotate(angle: -0.02 - (1 - k) * 0.12, child: Transform.scale(scale: 0.4 + 0.6 * k, child: child)),
-          ),
-          child: SizedBox(
-            width: 540,
-            child: CustomPaint(
-              painter: _LetterPainter(),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(30, 22, 34, 28),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        const Text('しょうたいじょう', style: TextStyle(fontSize: 18, color: Palette.pencil)),
-                        const Spacer(),
-                        // 切手
-                        DoodleBox(seed: 161, dashed: true, padding: const EdgeInsets.all(8), child: AvatarView(avatar: Avatar.decode(invite.avatar), size: 44, bust: true)),
-                      ],
-                    ),
-                    Text('${invite.from} さんから', style: const TextStyle(fontSize: 30)),
-                    const SizedBox(height: 6),
-                    Text('「PONG! ${invite.game.title}」で あそぼう！', style: const TextStyle(fontSize: 24)),
-                    const SizedBox(height: 4),
-                    Text(invite.game.tagline, style: const TextStyle(fontSize: 17, color: Palette.pencil)),
-                    Text('部屋コード ${invite.code}', style: const TextStyle(fontSize: 17)),
-                    const SizedBox(height: 18),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(width: 160, child: DoodleButton(label: 'ことわる', seed: 163, onPressed: model.declineInvite)),
-                        const SizedBox(width: 16),
-                        SizedBox(width: 200, child: DoodleButton(label: '参加する', icon: Icons.waving_hand_rounded, primary: true, seed: 162, onPressed: model.acceptInvite)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 便せん: 手描きの枠と影、薄い罫線
-class _LetterPainter extends SketchBorderPainter {
-  _LetterPainter() : super(seed: 160);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    super.paint(canvas, size);
-    for (var y = 74.0; y < size.height - 30; y += 34) {
-      canvas.drawPath(Sketch.line(Offset(26, y), Offset(size.width - 34, y), seed: y.toInt(), wobble: 0.6), Sketch.pen(1, color: Palette.faint));
-    }
-  }
-}
-
-/// 設定画面などで使う見た目の編集（スマホ版 AvatarEditor）
-class ProfileEditor extends StatelessWidget {
-  const ProfileEditor({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final settings = Services.of(context).settings;
-    return ListenableBuilder(
-      listenable: settings,
-      builder: (context, _) => AvatarEditor(value: settings.avatar, onChanged: (a) => settings.avatar = a),
     );
   }
 }

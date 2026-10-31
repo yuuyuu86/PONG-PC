@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -18,7 +17,7 @@ class Recorder implements SessionListener {
   final states = <MatchState>[];
   final stateJson = <int, String>{};
   var joined = 0, reconnecting = 0;
-  final failures = <String>[], ended = <String>[], declined = <String>[];
+  final failures = <String>[], ended = <String>[];
   RoomInfo? get room => rooms.isEmpty ? null : rooms.last;
 
   @override
@@ -37,8 +36,6 @@ class Recorder implements SessionListener {
   void sessionReconnecting(DateTime since) => reconnecting++;
   @override
   void sessionEnded(String reason) => ended.add(reason);
-  @override
-  void inviteDeclined(String name) => declined.add(name);
 }
 
 Future<void> waitUntil(String label, bool Function() cond, {Duration timeout = const Duration(seconds: 10)}) async {
@@ -191,32 +188,6 @@ void main() {
       timeout: const Duration(seconds: 2),
     );
     expect(link, isNull);
-  });
-
-  test('紙飛行機の招待: 受け取って「参加する」とその接続のまま部屋に入る', () async {
-    final hostRec = Recorder(), guestRec = Recorder();
-    host = HostSession(game: GameKind.badminton, me: const Profile('ホスト', ''), listener: hostRec);
-    await listen();
-    // 招待される側の待ち受け
-    final inviteeServer = await SecureServerSocket.bind(lo, 0, identity.context);
-    final got = Completer<(Msg, Link)>();
-    inviteeServer.listen((s) {
-      final link = Link(s);
-      link.onMessage = (m) {
-        link.onMessage = null;
-        got.complete((m, link));
-      };
-    });
-    await host.sendInvite(address: lo, port: inviteeServer.port, fingerprint: identity.fingerprint, peerName: 'ゲスト', y: 0.4, delay: 1.2);
-    final (msg, link) = await got.future.timeout(const Duration(seconds: 5));
-    expect(msg['t'], 'invite');
-    expect(msg['code'], host.code);
-    expect(msg['game'], 'badminton');
-    expect(msg['delay'], 1.2);
-    final guest = GuestSession(code: msg['code'] as String, me: const Profile('ゲスト', ''), listener: guestRec, findHost: (_) => null);
-    guest.adopt(link);
-    await waitUntil('招待で参加', () => guestRec.joined == 1 && hostRec.room?.players[1].present == true);
-    await inviteeServer.close();
   });
 
   test('UDP のお知らせで、同じPCの2つの PONG! がお互いを見つける', () async {

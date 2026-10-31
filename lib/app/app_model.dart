@@ -112,24 +112,6 @@ class Hud {
   int get hashCode => Object.hash(phase, count, score[0], score[1], server, paused, resumeCount, lastPoint?.n, winner, extra, serving);
 }
 
-/// 紙飛行機の飛行（自分の画面から出ていく / 相手の画面に入ってくる）
-class Flight {
-  Flight({required this.outbound, required this.from, required this.yFrac}) : start = DateTime.now();
-  final bool outbound;
-  final Offset from;
-  final double yFrac;
-  final DateTime start;
-}
-
-class IncomingInvite {
-  IncomingInvite({required this.from, required this.avatar, required this.game, required this.code, required this.link});
-  final String from;
-  final String avatar;
-  final GameKind game;
-  final String code;
-  final Link link;
-}
-
 class ConnectionProblem {
   const ConnectionProblem({required this.title, required this.body, required this.isFinal, this.since});
   final String title;
@@ -161,9 +143,6 @@ class AppModel extends ChangeNotifier implements SessionListener {
   ({String text, bool error})? joinMessage;
   bool busy = false;
   ConnectionProblem? connection;
-  IncomingInvite? invite;
-  final flights = <Flight>[];
-  String? inviteStatus;
   DateTime? oppGoneAt;
   String? listenError;
 
@@ -182,7 +161,7 @@ class AppModel extends ChangeNotifier implements SessionListener {
 
   Future<void> start() async {
     try {
-      // 相手からの接続（参加・招待・再接続）を待ち受ける。ポートは空いているものを自動で使う
+      // 相手からの接続（参加・再接続）を待ち受ける。ポートは空いているものを自動で使う
       final identity = await PeerIdentity.create();
       _identity = identity;
       final s = await SecureServerSocket.bind(InternetAddress.anyIPv4, 0, identity.context);
@@ -238,7 +217,6 @@ class AppModel extends ChangeNotifier implements SessionListener {
     joinMessage = null;
     final h = HostSession(game: game, me: profile, listener: this, rule: rule)..onAdvertChange = _advertise;
     host = h;
-    inviteStatus = null;
     _advertise();
     h.broadcastRoom();
   }
@@ -331,88 +309,7 @@ class AppModel extends ChangeNotifier implements SessionListener {
     room = null;
     oppGoneAt = null;
     feed.reset();
-    inviteStatus = null;
     _advertise();
-  }
-
-  // 招待（紙飛行機） ------------------------------------------------------
-
-  /// 招待できる相手: 部屋に入っていない近くのPC
-  List<Peer> get invitablePeers => discovery.peers.where((p) => p.state == PeerState.idle).toList();
-
-  void sendInvite(Peer peer, {required Offset from, required Size window}) {
-    final h = host;
-    if (h == null) return;
-    feedback.play(Sound.plane);
-    const yFrac = 0.38;
-    final flight = Flight(outbound: true, from: from, yFrac: yFrac);
-    flights.add(flight);
-    final delay = PlaneMotion.outCrossTime(from, window, yFrac);
-    h.sendInvite(address: peer.address, port: peer.port, fingerprint: peer.fingerprint, peerName: peer.name, y: yFrac, delay: delay);
-    inviteStatus = '${peer.name} に紙飛行機を飛ばしました。返事を待っています…';
-    notifyListeners();
-    Timer(Duration(milliseconds: ((PlaneMotion.outTotal + 0.8) * 1000).round()), () {
-      flights.remove(flight);
-      notifyListeners();
-    });
-  }
-
-  void _receiveInvite(Msg m, Link link) {
-    // 部屋に入っている・すでに招待状を見ているときはことわる
-    final game = GameKind.values.asNameMap()[m['game']];
-    if (inRoom || invite != null || game == null) {
-      link.send(const {'t': 'inviteDecline'});
-      link.closeSoon();
-      return;
-    }
-    link.onClose = () {
-      if (invite?.link == link) {
-        invite = null;
-        notifyListeners();
-      }
-    };
-    final y = (m['y'] as num?)?.toDouble() ?? 0.4;
-    final delay = ((m['delay'] as num?)?.toDouble() ?? 0).clamp(0, 3);
-    Timer(Duration(milliseconds: (delay * 1000).round()), () {
-      if (link.isClosed) return;
-      feedback.play(Sound.plane, gain: 0.8);
-      final flight = Flight(outbound: false, from: Offset.zero, yFrac: y);
-      flights.add(flight);
-      notifyListeners();
-      Timer(Duration(milliseconds: (PlaneMotion.inLand * 1000).round()), () {
-        if (link.isClosed) return;
-        feedback.play(Sound.point, gain: 0.6);
-        invite = IncomingInvite(from: m['from'] as String? ?? 'だれか', avatar: m['avatar'] as String? ?? '', game: game, code: m['code'] as String? ?? '', link: link);
-        notifyListeners();
-      });
-      Timer(Duration(milliseconds: ((PlaneMotion.inTotal + 0.8) * 1000).round()), () {
-        flights.remove(flight);
-        notifyListeners();
-      });
-    });
-  }
-
-  void acceptInvite() {
-    final inv = invite;
-    if (inv == null) return;
-    invite = null;
-    _leaveQuietly();
-    final g = GuestSession(code: inv.code, me: profile, listener: this, findHost: _findHost);
-    guest = g;
-    busy = true;
-    _advertise();
-    g.adopt(inv.link);
-    notifyListeners();
-  }
-
-  void declineInvite() {
-    final inv = invite;
-    if (inv == null) return;
-    invite = null;
-    inv.link
-      ..send(const {'t': 'inviteDecline'})
-      ..closeSoon();
-    notifyListeners();
   }
 
   // 届いた接続の振り分け --------------------------------------------------
@@ -435,8 +332,6 @@ class AppModel extends ChangeNotifier implements SessionListener {
               ..send({'t': 'refused', 'reason': m['token'] == null ? 'not_found' : 'expired'})
               ..closeSoon();
           }
-        case 'invite':
-          _receiveInvite(m, link);
         default:
           link.close();
       }
@@ -485,8 +380,7 @@ class AppModel extends ChangeNotifier implements SessionListener {
     }
     if (opp.present && opp.connected && prev?.opponent.present != true) {
       feedback.play(Sound.point, gain: 0.5);
-      inviteStatus = null;
-    }
+      }
     _route();
     notifyListeners();
   }
@@ -552,60 +446,11 @@ class AppModel extends ChangeNotifier implements SessionListener {
   }
 
   @override
-  void inviteDeclined(String name) {
-    inviteStatus = '$name は招待をことわりました（または届きませんでした）。';
-    notifyListeners();
-  }
-
-  @override
   void dispose() {
     _leaveQuietly();
     _server?.close();
     keyboard.dispose();
     discovery.dispose();
     super.dispose();
-  }
-}
-
-/// 招待の紙飛行機の動き。2台のPCを並べたとき、左のPCの右端から飛び出して、
-/// 右のPCの左端の同じ高さから入ってくるように見せる。
-abstract final class PlaneMotion {
-  static const pop = 0.26; // その場で紙を折って飛行機にする時間
-  static const outTravel = 1.5;
-  static const outTotal = pop + outTravel;
-  static const inTravel = 1.7;
-  static const inLand = inTravel + 0.12;
-  static const inTotal = inTravel + 0.35;
-
-  static Offset bezier(List<Offset> p, double t) {
-    final u = 1 - t;
-    final a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
-    return p[0] * a + p[1] * b + p[2] * c + p[3] * d;
-  }
-
-  static List<Offset> outPath(Offset from, Size size, double yFrac) {
-    final y = yFrac * size.height;
-    return [from, Offset(from.dx + 40, from.dy - 230), Offset(size.width * 0.78, y - 150), Offset(size.width + 120, y)];
-  }
-
-  /// だんだん加速して飛び去る
-  static double outEase(double t) => t * t * (1.6 - 0.6 * t);
-
-  static List<Offset> inPath(Size size, double yFrac) {
-    final y = yFrac * size.height;
-    return [Offset(-120, y), Offset(size.width * 0.3, y - 30), Offset(size.width * 0.4, size.height * 0.26), Offset(size.width * 0.5, size.height * 0.42)];
-  }
-
-  /// 速く入ってきて、ふわっと減速する
-  static double inEase(double t) => 1 - (1 - t) * (1 - t) * (1 - 0.4 * t);
-
-  /// 自分の画面の右端を越えるまでの時間（相手の画面ではこの時間だけ待ってから入ってくる）
-  static double outCrossTime(Offset from, Size size, double yFrac) {
-    final path = outPath(from, size, yFrac);
-    for (var i = 0; i <= 200; i++) {
-      final t = i / 200;
-      if (bezier(path, outEase(t)).dx >= size.width) return pop + t * outTravel;
-    }
-    return outTotal;
   }
 }

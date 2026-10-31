@@ -193,7 +193,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 }
 
-/// 毎フレーム時刻を知らせる（試合や紙飛行機の描き直し用）
+/// 毎フレーム時刻を知らせる（試合の描き直し用）
 class FrameClock extends StatefulWidget {
   const FrameClock({super.key, required this.builder, this.running = true});
 

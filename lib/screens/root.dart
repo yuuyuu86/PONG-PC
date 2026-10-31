@@ -6,7 +6,6 @@ import '../app/app_model.dart';
 import '../app/feedback.dart';
 import '../app/services.dart';
 import '../games/core/catalog.dart';
-import '../games/core/painting.dart';
 import '../net/wire.dart';
 import '../ui/doodle.dart';
 import '../ui/logo.dart';
@@ -19,7 +18,7 @@ import 'records.dart';
 import 'room.dart';
 import 'setup.dart';
 
-/// 画面の切り替えと、どの画面にも重ねるもの（接続の問題・招待状・紙飛行機）
+/// 画面の切り替えと、どの画面にも重ねるもの（接続の問題）
 class RootScreen extends StatefulWidget {
   const RootScreen({super.key, this.splash = true});
 
@@ -79,8 +78,6 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
           children: [
             Positioned.fill(child: AnimatedSwitcher(duration: const Duration(milliseconds: 150), child: KeyedSubtree(key: ValueKey(model.screen), child: screen))),
             if (model.connection != null) Positioned.fill(child: ConnectionOverlay(problem: model.connection!)),
-            if (model.invite != null) Positioned.fill(child: InviteLetter(invite: model.invite!)),
-            Positioned.fill(child: IgnorePointer(child: PlaneLayer(flights: List.of(model.flights)))),
           ],
         );
       },
@@ -197,111 +194,6 @@ class Countdown extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// 紙飛行機
-
-/// ウィンドウ全体に重ねる紙飛行機のレイヤー（クリックは下へ通す）。軌跡はロゴと同じ鉛筆の点線。
-class PlaneLayer extends StatelessWidget {
-  const PlaneLayer({super.key, required this.flights});
-
-  final List<Flight> flights;
-
-  @override
-  Widget build(BuildContext context) {
-    if (flights.isEmpty) return const SizedBox.expand();
-    return FrameClock(
-      builder: (context, time) => CustomPaint(size: Size.infinite, painter: _PlanePainter(flights, time)),
-    );
-  }
-}
-
-class _PlanePainter extends CustomPainter {
-  _PlanePainter(this.flights, this.time) : super(repaint: time);
-
-  final List<Flight> flights;
-  final ValueNotifier<double> time;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final now = DateTime.now();
-    for (final f in flights) {
-      final el = now.difference(f.start).inMicroseconds / 1e6;
-      if (f.outbound) {
-        _out(canvas, size, f, el);
-      } else {
-        _in(canvas, size, f, el);
-      }
-    }
-  }
-
-  /// 少し前までの位置を鉛筆の点線で結び、古い部分ほど薄くする
-  void _trail(Canvas c, double t, double span, double fade, Offset Function(double) point) {
-    const steps = 28;
-    for (var i = 0; i < steps; i++) {
-      final t0 = math.max(0.0, t - span * (steps - i) / steps);
-      final t1 = math.max(0.0, t - span * (steps - i - 1) / steps);
-      if (t1 <= t0 || i.isOdd) continue; // 1つおきに描いて点線にする
-      c.drawLine(point(t0), point(t1), Sketch.pen(1.8, color: Palette.pencil.withValues(alpha: (i + 1) / steps * fade)));
-    }
-  }
-
-  void _out(Canvas c, Size size, Flight f, double el) {
-    if (el < PlaneMotion.pop) {
-      final k = el / PlaneMotion.pop;
-      drawPlane(c, f.from, -0.6 + math.sin(k * math.pi) * 0.5, scale: 0.3 + k * 0.7, flatten: 1 - k);
-      return;
-    }
-    final path = PlaneMotion.outPath(f.from, size, f.yFrac);
-    final raw = (el - PlaneMotion.pop) / PlaneMotion.outTravel;
-    final t = math.min(1.0, raw);
-    final fade = raw > 1 ? math.max(0.0, 1 - (raw - 1) * 2) : 1.0;
-    Offset pos(double u) => PlaneMotion.bezier(path, PlaneMotion.outEase(u));
-    _trail(c, t, 0.45, fade, pos);
-    if (t >= 1) return;
-    final p = pos(t), q = pos(math.max(0, t - 0.01));
-    drawPlane(c, p, math.atan2(p.dy - q.dy, p.dx - q.dx), scale: 1 + t * 0.25);
-  }
-
-  void _in(Canvas c, Size size, Flight f, double el) {
-    final raw = el / PlaneMotion.inTravel;
-    final t = math.min(1.0, raw);
-    final path = PlaneMotion.inPath(size, f.yFrac);
-    Offset pos(double u) => PlaneMotion.bezier(path, PlaneMotion.inEase(u)) + Offset(0, math.sin(u * math.pi * 3) * 14 * (1 - u));
-    final fade = raw > 1 ? math.max(0.0, 1 - (raw - 1) * 3) : 1.0;
-    _trail(c, t, 0.4, fade, pos);
-    final p = pos(t);
-    if (t < 1) {
-      final q = pos(math.max(0, t - 0.01));
-      drawPlane(c, p, math.atan2(p.dy - q.dy, p.dx - q.dx), scale: 1.25 - t * 0.1);
-    } else {
-      // 着地: 機体を開いて招待状になる
-      final k = math.min(1.0, (el - PlaneMotion.inTravel) / 0.32);
-      drawPlane(c, p, 0, scale: 1.15 + k * 1.4, flatten: k, opacity: 1 - k);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _PlanePainter old) => true;
-}
-
-/// 上から見た紙飛行機（機首が +x）。片翼は影として斜線で塗る
-void drawPlane(Canvas c, Offset at, double angle, {double scale = 1, double flatten = 0, double opacity = 1}) {
-  if (opacity <= 0) return;
-  c.saveLayer(null, Paint()..color = Colors.black.withValues(alpha: opacity));
-  c.translate(at.dx, at.dy);
-  c.rotate(angle);
-  c.scale(scale, scale * (1 - flatten * 0.55));
-  const nose = Offset(34, 0), top = Offset(-24, -19), bottom = Offset(-24, 17), tail = Offset(-13, 0);
-  final under = Path()..addPolygon(const [nose, bottom, tail], true);
-  c.drawPath(under, Sketch.fill(Palette.paperShade));
-  Sketch.hatch(c, under, const Rect.fromLTWH(-26, 0, 62, 20), gap: 4, width: 0.9, color: Palette.pencil, seed: 4);
-  c.drawPath(Path()..addPolygon(const [nose, top, tail], true), Sketch.fill(Colors.white));
-  ink(c, polyline(const [nose, top, tail, bottom, nose], seed: 3, wobble: 0.5), 2.4);
-  ink(c, Sketch.line(nose, tail, seed: 9, wobble: 0.4), 1.6);
-  ink(c, Sketch.line(const Offset(32, -1), const Offset(-21, -9), seed: 11, wobble: 0.3), 1);
-  c.restore();
-}
-
 /// 「2台を横に並べてね」の注意書き。左右の画面がつながってコートになるので、並べる向きをイラストで見せる。
 /// [you] は 0 なら左（部屋を作った人）、1 なら右（参加する人）。
 class SideBySideHint extends StatelessWidget {
@@ -340,7 +232,7 @@ class SideBySideHint extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text('$text バレーとバドミントンは2台の画面がつながって、ひとつのコートになります（ネットが境目）。紙飛行機もとなりの画面へ飛んでいきます。', style: const TextStyle(fontSize: 16, height: 1.45)),
+          Text('$text バレーとバドミントンは2台の画面がつながって、ひとつのコートになります（ネットが境目）。', style: const TextStyle(fontSize: 16, height: 1.45)),
         ],
       ),
     );

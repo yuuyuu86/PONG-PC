@@ -26,8 +26,6 @@ abstract class SessionListener {
 
   /// 部屋が終わった（closed: ホストが閉じた / gaveUp: 再接続できなかった / expired: 部屋がもうない）
   void sessionEnded(String reason);
-
-  void inviteDeclined(String name);
 }
 
 /// 自分の名前と見た目
@@ -91,7 +89,6 @@ class HostSession {
   Timer? _heartbeat;
   final _clock = Stopwatch();
   double _acc = 0;
-  final _invites = <Link>[];
 
   /// 部屋の状態が変わったとき（お知らせの内容を更新するため）
   void Function()? onAdvertChange;
@@ -142,9 +139,6 @@ class HostSession {
     link.send({'t': 'joined', 'side': 1, 'token': token, 'game': game.name, 'resumed': false});
     broadcastRoom();
     onAdvertChange?.call();
-    for (final l in [..._invites]) {
-      if (l != link) l.close();
-    }
   }
 
   void _attach(Link link) {
@@ -154,38 +148,6 @@ class HostSession {
     link.onClose = () {
       if (_guest?.link == link) _guestDropped();
     };
-  }
-
-  // 招待（紙飛行機） ------------------------------------------------------
-
-  Future<void> sendInvite({required InternetAddress address, required int port, required String fingerprint, required String peerName, required double y, required double delay}) async {
-    final link = await Link.connect(address, port, expectedFingerprint: fingerprint);
-    if (link == null) {
-      listener.inviteDeclined(peerName);
-      return;
-    }
-    _invites.add(link);
-    link.onMessage = (m) {
-      switch (m['t']) {
-        case 'inviteAccept':
-          _invites.remove(link);
-          if (_guest == null) {
-            _admit(link, m['name'] as String? ?? peerName, m['avatar'] as String? ?? '');
-          } else {
-            _refuse(link, 'full');
-          }
-        case 'inviteDecline':
-          _invites.remove(link);
-          listener.inviteDeclined(peerName);
-          link.close();
-      }
-    };
-    link.onClose = () => _invites.remove(link);
-    link.send({'t': 'invite', 'from': _me.name, 'avatar': _me.avatar, 'game': game.name, 'code': code, 'y': y, 'delay': delay});
-    // 返事がないまま長く待たない
-    Timer(const Duration(seconds: 90), () {
-      if (_invites.contains(link)) link.close();
-    });
   }
 
   // 相手からのメッセージ --------------------------------------------------
@@ -281,9 +243,6 @@ class HostSession {
     link?.send(const {'t': 'closed'});
     link?.closeSoon();
     _grace?.cancel();
-    for (final l in [..._invites]) {
-      l.close();
-    }
     _stopLoop();
     _heartbeat?.cancel();
     _guest = null;
@@ -440,12 +399,6 @@ class GuestSession {
     }
     _attach(l);
     l.send({'t': 'join', 'code': code, 'name': _me.name, 'avatar': _me.avatar, 'token': _token});
-  }
-
-  /// 招待を受けた接続をそのまま使って参加する
-  void adopt(Link l) {
-    _attach(l);
-    l.send({'t': 'inviteAccept', 'name': _me.name, 'avatar': _me.avatar});
   }
 
   void _attach(Link l) {

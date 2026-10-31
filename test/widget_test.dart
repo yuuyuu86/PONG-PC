@@ -38,7 +38,6 @@ void main() {
     const me = PlayerInfo(present: true, name: 'ゆうた', connected: true);
     model.sessionRoom(const RoomInfo(code: 'KQTE', game: GameKind.volley, phase: RoomPhase.lobby, you: 0, players: [me, PlayerInfo.empty]));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('紙飛行機で招待'), findsOneWidget);
     expect(find.textContaining('まだいません'), findsOneWidget);
 
     model.sessionRoom(const RoomInfo(code: 'KQTE', game: GameKind.volley, phase: RoomPhase.lobby, you: 0, players: [
@@ -47,8 +46,8 @@ void main() {
     ]));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.textContaining('はなこ'), findsOneWidget);
-    expect(find.text('紙飛行機で招待'), findsNothing, reason: '相手がそろったら招待の欄は消える');
     expect(find.textContaining('「準備OK」を押してください'), findsOneWidget);
+    expect(find.text('左右を入れかえる'), findsOneWidget, reason: '相手がそろってからも左右を入れかえられる');
     model.keyboard.dispose();
   });
 

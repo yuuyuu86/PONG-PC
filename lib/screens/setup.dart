@@ -24,7 +24,7 @@ class CreateScreen extends StatelessWidget {
       child: PageBody(
         maxWidth: 980,
         children: [
-          const Text('あそぶ競技をえらんでください。部屋ができたら、4文字のコードを相手に伝えるか、紙飛行機で招待します。あなたが左の選手になります。', style: TextStyle(fontSize: 18, height: 1.45)),
+          const Text('あそぶ競技をえらんでください。部屋ができたら、4文字のコードを相手に伝えます。あなたが左の選手になります。', style: TextStyle(fontSize: 18, height: 1.45)),
           const SizedBox(height: 20),
           LayoutBuilder(
             builder: (context, c) {

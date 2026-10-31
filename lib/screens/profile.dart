@@ -44,7 +44,7 @@ class DoodleTextField extends StatelessWidget {
   }
 }
 
-/// 初めて開いたときのプレイヤー登録。名前と見た目は対戦相手の画面や招待状に表示される。
+/// 初めて開いたときのプレイヤー登録。名前と見た目は対戦相手の画面に表示される。
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 

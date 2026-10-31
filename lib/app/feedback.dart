@@ -2,9 +2,9 @@ import 'package:audioplayers/audioplayers.dart';
 
 import 'settings.dart';
 
-enum Sound { hit, bounce, point, lose, win, tap, plane }
+enum Sound { hit, bounce, point, lose, win, tap }
 
-/// 効果音（スマホ版と同じ音 + 紙飛行機）。設定でミュート・音量を切り替えられる。
+/// 効果音（スマホ版と同じ音）。設定でミュート・音量を切り替えられる。
 class GameFeedback {
   GameFeedback(this.settings);
 
